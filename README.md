@@ -6,9 +6,10 @@ A retrieval-augmented generation service over a corpus of ArXiv CS/AI abstracts.
 
 Runs entirely on your machine with `docker compose up` — using either a local model via Ollama (no API key, no cost) or your own provider key.
 
-> **Status: in development — 7 of 13 steps complete.**
-> Ask a question and get a grounded, cited answer, or an honest refusal. The HTTP API,
-> the UI and deployment are not built yet.
+> **Status: in development — 9 of 13 steps complete.**
+> A working browser app over the corpus: ask a question, get a grounded cited answer or an
+> honest refusal, and see the papers behind both. Containerisation and deployment are not
+> built yet.
 > No benchmark in this README is estimated or aspirational — numbers appear only after
 > they are measured.
 
@@ -171,8 +172,8 @@ Thirteen steps. Each one ends with something that runs, and this table is update
 | 4 | Evaluation harness — hand-written questions, hit-rate@k | ✅ |
 | 5 | RAG generation — grounded answer with citations | ✅ |
 | 6 | Refusal — tested "I don't know" path | ✅ |
-| 7 | FastAPI `/ask` endpoint | ⬜ |
-| 8 | Streamlit UI | ⬜ |
+| 7 | FastAPI `/ask` endpoint | ✅ |
+| 8 | Streamlit UI | ✅ |
 | 9 | Dockerise the application | ⬜ |
 | 10 | Deploy to AWS | ⬜ |
 | 11 | CI/CD | ⬜ |
@@ -226,6 +227,72 @@ vectors and raises `ModelMismatch` if it disagrees with the configuration.
 
 **`hnsw.ef_search` is set per connection, never left to the default** — see below for why that matters
 more than it should.
+
+## Running it
+
+Three processes: Postgres in Docker, Ollama for generation, and the app.
+
+```bash
+docker compose up -d                       # Postgres + pgvector
+ollama serve &                             # local model
+uv run uvicorn app.main:app &              # API on :8000
+uv run streamlit run ui/Home.py            # UI on :8501
+```
+
+The UI reaches the API over HTTP and never imports from it — `tests/test_ui.py` asserts that by
+parsing the imports. It is an easy boundary to erase by accident, and erasing it would make the API
+decorative: untested by anything a user touches, and at step 9 a container with two entrypoints
+pretending to be one.
+
+**What the UI shows that most AI demos do not.** Every answer carries the papers consulted, how close
+each one was, which models produced it, and how long it took. A refusal is rendered as information
+rather than as an error, with the five consulted papers still listed — because "consulted five, none
+answered" is a different statement from "something broke", and only one of them is true. All of it is
+free to display, because the API already returns it.
+
+## API
+
+```bash
+uv run uvicorn app.main:app --reload    # http://localhost:8000/docs
+```
+
+```console
+$ curl -s localhost:8000/health
+{"status":"ok","papers":30061,"embeddings":30061,
+ "embedding_model":"BAAI/bge-base-en-v1.5","generation_model":"qwen3:4b-instruct",
+ "llm_reachable":true}
+```
+
+```console
+$ curl -s -X POST localhost:8000/ask -H 'Content-Type: application/json' \
+    -d '{"question":"how can learned noise protect private data sent to a cloud service?"}'
+{
+  "answer": "Learned noise can protect private data by adding distributions that reduce the
+             information content of the communicated data [1]. ...",
+  "refused": false,
+  "sources":   [{"marker":1,"paper_id":"1905.11814","title":"Shredder: Learning Noise ...",
+                 "url":"https://arxiv.org/abs/1905.11814","distance":0.1856}],
+  "retrieved": [ ...5 papers with distances... ],
+  "models":    {"embedding":"BAAI/bge-base-en-v1.5","generation":"qwen3:4b-instruct"},
+  "latency_ms": 3782.3
+}
+```
+
+**`retrieved` is returned next to `sources`.** `sources` is what the answer cited; `retrieved` is
+everything that went into the prompt. A refusal therefore returns five papers and zero sources —
+"consulted five, none answered" is a different statement from "found nothing", and only one of them
+is true. It is also the difference between diagnosing bad retrieval and bad grounding.
+
+**The response names the models that produced it.** Which embedder and which generator answered is
+part of what the answer means; two responses are not comparable without it.
+
+**Failure modes are distinguished.** Ollama unreachable is `503` — a dependency is down, retrying may
+work. A corpus embedded with a different model is `500` — this service is misconfigured and retrying
+never helps. Both carry a message that names what to fix.
+
+**The embedding model loads at startup, not on first request.** It costs about eight seconds; left
+lazy, the first caller sees eleven seconds where everyone else sees three, which reads as an
+intermittent fault rather than a warm-up.
 
 ## Generation
 
