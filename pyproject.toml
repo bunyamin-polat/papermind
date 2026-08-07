@@ -3,12 +3,19 @@ name = "papermind"
 version = "0.1.0"
 description = "RAG over AI research papers — ask a question, get a cited answer"
 readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Bunyamin Polat" }]
 requires-python = ">=3.12"
 dependencies = [
     # Step 0-1. Everything else arrives with the step that needs it —
     # sentence-transformers at step 2, langchain at step 5, fastapi at step 7.
+    "pandas>=2.2",
+    "pgvector>=0.3",
     "psycopg[binary]>=3.2",
+    "pyarrow>=17",
     "pydantic-settings>=2.7",
+    "sentence-transformers>=3.0",
 ]
 
 [dependency-groups]
@@ -31,3 +38,5 @@ select = ["E", "F", "I", "UP", "B"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# The repo root is not a package, so tell pytest to import from it.
+pythonpath = ["."]

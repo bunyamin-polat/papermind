@@ -19,6 +19,19 @@ class Settings(BaseSettings):
     postgres_host: str = "localhost"
     postgres_port: int = 5434
 
+    # Embedding. The dimension is not a free parameter — it must match the model,
+    # and the `vector(N)` column is declared from it. Changing the model means a new
+    # column width and a re-embed, which is why the model name is stored per row.
+    embedding_model: str = "BAAI/bge-base-en-v1.5"
+    embedding_dim: int = 768
+    embedding_batch_size: int = 64
+
+    # How hard HNSW searches. This is set explicitly because pgvector's default is
+    # 40, and 40 is the single value at which the planner abandons the index for a
+    # sequential scan — 19x slower, identical results, no warning. Measured in
+    # scripts/bench_index.py; every other value tested uses the index.
+    hnsw_ef_search: int = 100
+
     # Empty until step 5.
     openai_api_key: str = ""
 
