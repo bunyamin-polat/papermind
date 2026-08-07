@@ -1,0 +1,34 @@
+{"slice": "in_corpus", "expected": "1604.08182", "question": "how can hyperspectral images be classified without labels using total variation methods?"}
+{"slice": "in_corpus", "expected": "1606.07035", "question": "how do you make constraint-based causal discovery more reliable when there is little data?"}
+{"slice": "in_corpus", "expected": "1607.00470", "question": "why did keyframe-based monocular SLAM replace filter-based approaches?"}
+{"slice": "in_corpus", "expected": "1903.08100", "question": "can a deep network localise the seizure onset zone from EEG in focal epilepsy?"}
+{"slice": "in_corpus", "expected": "1904.10761", "question": "how does data cleaning affect model fairness and robustness to attacks, not just accuracy?"}
+{"slice": "in_corpus", "expected": "1905.11814", "question": "how can learned noise protect private data sent to a cloud inference service?"}
+{"slice": "in_corpus", "expected": "1911.11916", "question": "how do you handle limited labelled images when classifying construction site equipment?"}
+{"slice": "in_corpus", "expected": "1911.12093", "question": "how are graph convolutional networks used to forecast traffic across a road network?"}
+{"slice": "in_corpus", "expected": "2004.14850", "question": "what role will machine learning play at the network edge in 6G?"}
+{"slice": "in_corpus", "expected": "2107.09144", "question": "how can physical wave constraints be built into matrix factorisation with optimality guarantees?"}
+{"slice": "in_corpus", "expected": "2202.09649", "question": "how can you find local semantic directions in a GAN latent space without segmentation masks?"}
+{"slice": "in_corpus", "expected": "2210.13938", "question": "is syntactic priming in Hindi driven by one mechanism or by several?"}
+{"slice": "in_corpus", "expected": "2212.00638", "question": "why do small differences in how you finetune CLIP produce large accuracy differences?"}
+{"slice": "in_corpus", "expected": "2303.15672", "question": "what numerical methods solve convex multistage stochastic optimization problems?"}
+{"slice": "in_corpus", "expected": "2309.04366", "question": "how do you correct badly exposed photographs using a transformer?"}
+{"slice": "in_corpus", "expected": "2310.02489", "question": "how can transformer speech models be shrunk to fit in the memory of always-on devices?"}
+{"slice": "in_corpus", "expected": "2312.00746", "question": "how do large language models behave as agents in detective role-playing games?"}
+{"slice": "in_corpus", "expected": "2402.01845", "question": "how do you run bandit experiments when the units interfere with each other?"}
+{"slice": "in_corpus", "expected": "2407.17823", "question": "can bilevel optimization be solved without Hessians when the lower level is nonconvex?"}
+{"slice": "in_corpus", "expected": "2411.16645", "question": "which application areas do recommender system researchers neglect?"}
+{"slice": "in_corpus", "expected": "2503.02429", "question": "can removing one player from a tournament reverse the ranking of the others?"}
+{"slice": "in_corpus", "expected": "2510.21360", "question": "is there a benchmark for Swedish factual knowledge rather than a translated US one?"}
+{"slice": "in_corpus", "expected": "2602.10350", "question": "do intermediate layers of a speech model give better phoneme predictions than the final layer?"}
+{"slice": "in_corpus", "expected": "2605.30748", "question": "how can zero-shot text-to-speech stream its output while generating tokens in parallel?"}
+{"slice": "out_of_corpus", "expected": null, "question": "what is the best recipe for sourdough bread?"}
+{"slice": "out_of_corpus", "expected": null, "question": "who won the 2018 FIFA World Cup?"}
+{"slice": "out_of_corpus", "expected": null, "question": "how do I change a flat car tyre?"}
+{"slice": "out_of_corpus", "expected": null, "question": "what were Apple's quarterly earnings last year?"}
+{"slice": "out_of_corpus", "expected": null, "question": "how do I register a limited company in Turkey?"}
+{"slice": "out_of_corpus", "expected": null, "question": "what is the correct dosage of paracetamol for a child?"}
+{"slice": "keyword", "expected": "2406.06538", "question": "2406.06538"}
+{"slice": "keyword", "expected": "1607.00470", "question": "Keyframe-based monocular SLAM: design, survey, and future directions"}
+{"slice": "keyword", "expected": null, "question": "papers that do NOT use transformers"}
+{"slice": "keyword", "expected": null, "question": "papers by Yoshua Bengio"}

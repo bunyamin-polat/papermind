@@ -14,6 +14,21 @@ from pgvector.psycopg import register_vector
 
 from core.config import settings
 
+# Measured at step 4 on 24 in-corpus questions, not guessed:
+#
+#   k = 1  →  hit-rate 88%,  MRR 0.875
+#   k = 3  →  hit-rate 92%,  MRR 0.889
+#   k = 5  →  hit-rate 92%,  MRR 0.889
+#   k = 10 →  hit-rate 100%, MRR 0.903
+#
+# Latency is flat across k (~39 ms), so k costs nothing here — but at step 5 each
+# result becomes prompt context, and there k is paid for in tokens.
+#
+# 3 and 5 measured identically; with 24 questions one question is 4 points, so the
+# eval set cannot distinguish them. 5 is kept for margin. k = 10 reaches 100%, but
+# both of the misses sit at rank 6 — choosing k for them would be fitting to this
+# particular set of questions rather than to the problem. Revisit when the eval set
+# is larger and token cost is real.
 DEFAULT_K = 5
 
 SEARCH = """

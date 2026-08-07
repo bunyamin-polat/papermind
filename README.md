@@ -6,8 +6,9 @@ A retrieval-augmented generation service over a corpus of ArXiv CS/AI abstracts.
 
 Runs entirely on your machine with `docker compose up` — using either a local model via Ollama (no API key, no cost) or your own provider key.
 
-> **Status: in development — 4 of 13 steps complete.**
-> The corpus is loaded, embedded, indexed and searchable. Generation, the API and the UI are not built yet.
+> **Status: in development — 7 of 13 steps complete.**
+> Ask a question and get a grounded, cited answer, or an honest refusal. The HTTP API,
+> the UI and deployment are not built yet.
 > No benchmark in this README is estimated or aspirational — numbers appear only after
 > they are measured.
 
@@ -167,9 +168,9 @@ Thirteen steps. Each one ends with something that runs, and this table is update
 | 1 | Ingest the corpus into a `papers` table | ✅ |
 | 2 | Embed into pgvector | ✅ |
 | 3 | Retrieval — question → top-k papers by cosine similarity | ✅ |
-| 4 | Evaluation harness — hand-written questions, hit-rate@k | ⬜ |
-| 5 | RAG generation — grounded answer with citations | ⬜ |
-| 6 | Refusal — tested "I don't know" path | ⬜ |
+| 4 | Evaluation harness — hand-written questions, hit-rate@k | ✅ |
+| 5 | RAG generation — grounded answer with citations | ✅ |
+| 6 | Refusal — tested "I don't know" path | ✅ |
 | 7 | FastAPI `/ask` endpoint | ⬜ |
 | 8 | Streamlit UI | ⬜ |
 | 9 | Dockerise the application | ⬜ |
@@ -226,6 +227,65 @@ vectors and raises `ModelMismatch` if it disagrees with the configuration.
 **`hnsw.ef_search` is set per connection, never left to the default** — see below for why that matters
 more than it should.
 
+## Generation
+
+```console
+$ uv run python -m retrieval.answer "how can learned noise protect private data sent to a cloud inference service"
+
+Learned noise can protect private data sent to a cloud inference service by adding noise
+distributions that reduce the information content of the communicated data [1]. Shredder, an
+end-to-end framework, learns these distributions through an offline process that balances
+inference accuracy against information degradation [1]. Experiments show a 74.70% reduction in
+mutual information between the input and the communicated data [1].
+
+Sources:
+  [1] Shredder: Learning Noise Distributions to Protect Inference Privacy
+      https://arxiv.org/abs/1905.11814
+```
+
+### The model is never shown an identifier
+
+It cites sources by their **position** in the list it was given — `[1]`, `[2]` — and code maps
+those positions back to papers. Ask a model to write `arXiv:2406.06538` and sooner or later it
+writes a plausible identifier for a paper that does not exist, with nothing in the text to reveal
+it. A position cannot be inflated into something real: `[9]` in a list of five is detectably wrong,
+so it is dropped and counted rather than shown.
+
+Across 68 generated answers, **zero invented citations**.
+
+### Refusal is one exact sentence
+
+`The provided sources do not answer this question.` — not "say you don't know". An exact string is
+testable; an instruction to be honest is not.
+
+### What it costs, per local model
+
+Same prompt, same corpus, 24 answerable and 6 unanswerable questions:
+
+| | `qwen3:4b-instruct` | `gpt-oss:20b` |
+|---|--:|--:|
+| Cites the expected paper | 83% | **92%** |
+| False refusals (answerable, refused) | 3 / 24 | 1 / 24 |
+| Out-of-corpus refused | **100%** | **100%** |
+| Invented citations | 0 | 0 |
+| Latency (median / max) | **3.2s / 12.3s** | 5.5s / 37.3s |
+| Download | **2.5 GB** | 13.8 GB |
+
+The larger model closes the gap to the retrieval ceiling — 92% end to end against 92% hit-rate,
+meaning generation loses nothing — **and it does so without spending any refusal discipline.** Both
+refuse every out-of-corpus question.
+
+The 4B is the default anyway, because 2.5 GB is the difference between "clone and run" and "clone,
+then find 14 GB and enough VRAM". Set `OLLAMA_MODEL=gpt-oss:20b` to trade 2.3 seconds for nine
+points of coverage.
+
+### The number most RAG projects do not publish
+
+Retrieval hit-rate@5 is 92%. End-to-end citation accuracy with the small model is 83%. **The
+nine-point gap is generation discarding papers retrieval had already found.** Two of the three false
+refusals had the correct paper at rank 1, with the answer stated verbatim in the abstract — the
+model simply declined. Reporting only the retrieval number would have hidden that entirely.
+
 ## Vector index
 
 Which index, measured rather than assumed — 30,061 vectors, top-5, timings taken server-side from
@@ -266,32 +326,41 @@ accuracy. It is pinned in `core/config.py` rather than left to the default.
 
 ## Metrics
 
-Filled in as the step that measures each one lands. The retrieval and cost figures arrive with the evaluation harness at step 4. Deliberately blank until then — an unmeasured number in a README is worse than no number.
+Measured by [`evaluation/run.py`](evaluation/run.py) against 34 hand-written questions: 24 answerable
+from the corpus, 6 the corpus provably cannot answer, and 4 that target known weak spots. Questions
+were written by reading a random sample of papers, and the retrieval results were not consulted while
+writing them.
+
+| k | hit-rate | MRR |
+|--:|--:|--:|
+| 1 | 88% | 0.875 |
+| 3 | 92% | 0.889 |
+| **5** | **92%** | **0.889** |
+| 10 | 100% | 0.903 |
 
 | Metric | Value |
 |---|---|
 | Corpus size | 30,061 papers |
-| Retrieval hit-rate@5 | — |
-| Mean / p95 latency | — |
-| Cost per query | — |
-| Refusal rate on out-of-corpus questions | — |
+| Retrieval hit-rate@5 | 92% (24 questions) |
+| Query latency | 39 ms median, 42 ms p95 |
+| Cost per query | $0 — retrieval is entirely local |
+| Refusal rate on out-of-corpus questions | 100% (6 questions) |
+| End-to-end citation accuracy | 83% small model · 92% large |
+| Answer latency | 3.2 s median (local, free) |
+| Invented citations | 0 / 68 answers |
 
-## Development
+**The two misses are not the same kind of miss**, which is only visible because the harness prints
+per-question results:
 
-```bash
-uv run ruff check .          # lint
-uv run pytest                # tests
-uv run python -m scripts.check_db
-```
+- *"how are graph convolutional networks used to forecast traffic across a road network?"* returned
+  five papers that are all genuinely about graph convolutions for traffic forecasting; the expected
+  paper was sixth. This is a limitation of single-gold-label evaluation, not of retrieval.
+- *"which application areas do recommender system researchers neglect?"* returned five recommender-
+  systems papers, none of which address neglected domains. Here retrieval matched the topic and
+  missed the actual question.
 
-Python 3.12, managed with `uv`. Postgres runs in Docker; the application runs on the host until step 9.
+**Out-of-corpus questions separate cleanly.** The closest paper for an in-corpus question sits at
+cosine distance 0.112-0.290; for a question the corpus cannot answer, 0.411-0.506. The gap of 0.121
+with no overlap is what makes a distance-based refusal threshold viable at step 6 — measured rather
+than assumed.
 
-## Roadmap
-
-Beyond the thirteen steps, once v1 is live: hybrid retrieval (BM25 + dense with reciprocal rank fusion), cross-encoder reranking, query rewriting, a calibrated LLM judge with confidence intervals, and a CI gate that fails the build on a quality regression.
-
-These are deliberately deferred. A measured, working, deployed system first; sophistication on top of something that already works.
-
-## License
-
-[MIT](LICENSE) © 2026 Bunyamin Polat

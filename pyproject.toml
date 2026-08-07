@@ -8,6 +8,7 @@ license-files = ["LICENSE"]
 authors = [{ name = "Bunyamin Polat" }]
 requires-python = ">=3.12"
 dependencies = [
+    "openai>=2.53.0",
     # Step 0-1. Everything else arrives with the step that needs it —
     # sentence-transformers at step 2, langchain at step 5, fastapi at step 7.
     "pandas>=2.2",
@@ -38,5 +39,9 @@ select = ["E", "F", "I", "UP", "B"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# Tests that call a real model are slow (seconds each) and need Ollama running.
+# They are excluded by default so `pytest` stays fast; run them with `-m llm`.
+addopts = "-m 'not llm'"
+markers = ["llm: needs a running LLM (slow)"]
 # The repo root is not a package, so tell pytest to import from it.
 pythonpath = ["."]
