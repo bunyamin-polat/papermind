@@ -1,0 +1,29 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Secrets — .env.example is committed, .env never is
+.env
+
+# Working files, local only — the spec I build against and my own learning notes.
+# The public repo carries README.md and the code, nothing about how it was made.
+CLAUDE.md
+NOTES.md
+
+# Downloaded corpus and model caches: large, reproducible, not source
+data/
+.cache/
+
+# Tooling
+.ruff_cache/
+.pytest_cache/
+
+# macOS
+.DS_Store

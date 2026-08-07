@@ -1,0 +1,33 @@
+# One service for now: Postgres with the pgvector extension compiled in.
+# The app itself gets containerised at step 9 — until then you run it on the host
+# and it talks to this database over the published port.
+services:
+  db:
+    # Plain `postgres:17` does NOT contain pgvector. This image is the official
+    # Postgres image with the extension built in.
+    image: pgvector/pgvector:pg17
+    container_name: papermind-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      # host:container — the container always listens on 5432 internally.
+      - "${POSTGRES_PORT:-5434}:5432"
+    volumes:
+      # Named volume: the data survives `docker compose down`.
+      # It does NOT survive `docker compose down -v` — that is how you reset.
+      - pgdata:/var/lib/postgresql/data
+      # Anything in here runs once, on first initialisation of an empty volume.
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      # Lets later services wait for a database that is actually accepting
+      # connections, rather than one whose process has merely started.
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pgdata:
