@@ -19,7 +19,11 @@ import boto3
 import yaml
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-TERRAFORM_DIR = REPO_ROOT / "terraform"
+# `infra/`, not `terraform/`. Slipway's scripts hardcode its own layout; the portfolio
+# convention — and the non-negotiable in every project here — is that Terraform lives in
+# `infra/` and is vendored rather than referenced. Adopting the blueprint a second time
+# is what surfaced the assumption.
+TERRAFORM_DIR = REPO_ROOT / "infra"
 APP_STACK = TERRAFORM_DIR / "stacks" / "20_app"
 CONFIG_FILE = REPO_ROOT / "slipway.yaml"
 
@@ -206,7 +210,7 @@ def backend_config(stack: Path) -> Path:
             f"{path} does not exist.\n"
             f"  cp {stack / 'backend.hcl.example'} {path}\n"
             "  then set `bucket` to the output of:\n"
-            "  terraform -chdir=terraform/stacks/00_bootstrap output -raw state_bucket_name"
+            "  terraform -chdir=infra/stacks/00_bootstrap output -raw state_bucket_name"
         )
     return path
 

@@ -10,7 +10,7 @@ region: us-east-1
 
 image:
   # Created once by 00_bootstrap.
-  repository: papermind
+  repository: papermind-app
   dockerfile: Dockerfile.lambda
   context: .
   # Uploaded to S3 and served from the edge, so the page does not start a container.

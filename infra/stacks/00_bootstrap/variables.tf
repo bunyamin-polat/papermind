@@ -93,3 +93,13 @@ variable "ecr_force_delete" {
   type        = bool
   default     = true
 }
+
+variable "create_oidc_provider" {
+  description = <<-EOT
+    AWS allows one OIDC provider per issuer per account. The first project to bootstrap
+    an account creates it; every project after that adopts it. False here because
+    Slipway created it already.
+  EOT
+  type        = bool
+  default     = false
+}

@@ -5,10 +5,36 @@
 # there is nothing in it to leak. AWS_SECRET_ACCESS_KEY in repo secrets is the most common
 # way portfolio projects lose their account, and this is the reason it never appears here.
 
+# The provider is an account-level singleton: AWS permits exactly one for
+# token.actions.githubusercontent.com. Slipway created it, and this repository is the
+# second project in the same account — so it is adopted rather than declared.
+#
+# This is the first thing the blueprint did not survive being copied twice. Everything
+# else in `00_bootstrap` is per-project (a budget, a bucket, a registry) and duplicates
+# happily; this one resource is shared by construction, and vendoring it as a `resource`
+# means the second adopter's first `apply` fails with EntityAlreadyExists.
+#
+# Set `create_oidc_provider = true` on a fresh account where nothing has created it yet.
 resource "aws_iam_openid_connect_provider" "github" {
+  count = var.create_oidc_provider ? 1 : 0
+
   url             = "https://token.actions.githubusercontent.com"
   client_id_list  = ["sts.amazonaws.com"]
   thumbprint_list = var.github_oidc_thumbprints
+}
+
+data "aws_iam_openid_connect_provider" "github" {
+  count = var.create_oidc_provider ? 0 : 1
+
+  url = "https://token.actions.githubusercontent.com"
+}
+
+locals {
+  github_oidc_provider_arn = (
+    var.create_oidc_provider
+    ? aws_iam_openid_connect_provider.github[0].arn
+    : data.aws_iam_openid_connect_provider.github[0].arn
+  )
 }
 
 locals {
@@ -50,7 +76,7 @@ data "aws_iam_policy_document" "github_assume_role" {
 
     principals {
       type        = "Federated"
-      identifiers = [aws_iam_openid_connect_provider.github.arn]
+      identifiers = [local.github_oidc_provider_arn]
     }
 
     # Without this the role would trust every GitHub repository in existence.

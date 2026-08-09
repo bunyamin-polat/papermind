@@ -3,9 +3,9 @@
 #
 #   cp terraform.tfvars.example terraform.tfvars
 
-project = "slipway"
+project = "papermind"
 region  = "us-east-1"
 
 budget_limit_usd    = "10"
 budget_alert_emails = ["bunyaminpolatch@gmail.com"]
-github_repository   = "bunyamin-polat/slipway"
+github_repository   = "bunyamin-polat/papermind"
