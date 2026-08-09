@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PaperMind — grounded answers from arXiv</title>
+<style>
+  :root { --bg:#fff; --fg:#111; --muted:#666; --line:#e5e5e5; --accent:#1a4d8f; --warn:#8a6d00; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#14161a; --fg:#e8e8e8; --muted:#9aa0a6; --line:#2a2e35; --accent:#7aa7e0; --warn:#d8b64a; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; padding:2rem 1rem 4rem; background:var(--bg); color:var(--fg);
+         font:16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; }
+  main { max-width: 46rem; margin: 0 auto; }
+  h1 { font-size: 1.6rem; margin: 0 0 .25rem; }
+  .sub { color: var(--muted); margin: 0 0 1.5rem; }
+  form { display:flex; gap:.5rem; margin-bottom:.75rem; }
+  input { flex:1; padding:.7rem .9rem; font-size:1rem; color:var(--fg);
+          background:var(--bg); border:1px solid var(--line); border-radius:.4rem; }
+  button { padding:.7rem 1.1rem; font-size:1rem; border:0; border-radius:.4rem;
+           background:var(--accent); color:#fff; cursor:pointer; }
+  button:disabled { opacity:.5; cursor:default; }
+  .examples { display:flex; flex-wrap:wrap; gap:.4rem; margin-bottom:2rem; }
+  .examples button { background:transparent; color:var(--muted); border:1px solid var(--line);
+                     font-size:.82rem; padding:.3rem .6rem; }
+  #answer { white-space:pre-wrap; margin:1.5rem 0; }
+  .refusal { border-left:3px solid var(--warn); padding:.6rem 0 .6rem .9rem; color:var(--warn); }
+  .note { color:var(--muted); font-size:.85rem; }
+  ol.sources { padding-left:1.2rem; }
+  ol.sources li { margin-bottom:.6rem; }
+  a { color:var(--accent); }
+  details { margin-top:1.5rem; border-top:1px solid var(--line); padding-top:1rem; }
+  summary { cursor:pointer; color:var(--muted); font-size:.9rem; }
+  .row { display:flex; gap:.5rem; align-items:baseline; font-size:.85rem; padding:.15rem 0; }
+  .dist { font-variant-numeric:tabular-nums; color:var(--muted); min-width:3.4rem; }
+  .stats { display:flex; gap:1.6rem; margin-top:1.5rem; padding-top:1rem;
+           border-top:1px solid var(--line); font-size:.85rem; color:var(--muted); }
+  .stats b { display:block; color:var(--fg); font-size:1.1rem; font-variant-numeric:tabular-nums; }
+</style>
+</head>
+<body>
+<main>
+  <h1>PaperMind</h1>
+  <p class="sub">Questions about AI research, answered from arXiv abstracts — with the papers.</p>
+
+  <form id="ask">
+    <input id="q" autocomplete="off" placeholder="how can learned noise protect private data?">
+    <button id="go" type="submit">Ask</button>
+  </form>
+  <div class="examples" id="examples"></div>
+
+  <div id="out" hidden>
+    <div id="answer"></div>
+    <div id="sources"></div>
+    <details id="consulted"></details>
+    <div class="stats" id="stats"></div>
+  </div>
+</main>
+
+<script>
+const EXAMPLES = [
+  "how can learned noise protect private data sent to a cloud inference service?",
+  "how do large language models behave as agents in detective role-playing games?",
+  "how are graph convolutional networks used to forecast traffic?",
+  "who won the 2018 FIFA World Cup?",
+];
+
+const $ = id => document.getElementById(id);
+
+EXAMPLES.forEach(text => {
+  const b = document.createElement("button");
+  b.textContent = text === EXAMPLES[3] ? "an unanswerable one" : text.split(" ").slice(2, 5).join(" ");
+  b.title = text;
+  b.onclick = () => { $("q").value = text; $("ask").requestSubmit(); };
+  $("examples").append(b);
+});
+
+// The API returns `marker` per source, so linking a citation is a substitution rather
+// than a parse. An unmapped marker is left as plain text: the API drops invented ones,
+// and a page that mislinked or crashed on one would be trusting a promise it cannot check.
+function linkCitations(text, sources) {
+  const byMarker = Object.fromEntries(sources.map(s => [s.marker, s.url]));
+  const escaped = text.replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+  return escaped.replace(/\[(\d+)\]/g, (m, n) =>
+    byMarker[n] ? `<a href="${byMarker[n]}" target="_blank" rel="noopener">[${n}]</a>` : m);
+}
+
+$("ask").onsubmit = async e => {
+  e.preventDefault();
+  const question = $("q").value.trim();
+  if (!question) return;
+
+  $("go").disabled = true;
+  $("out").hidden = false;
+  $("answer").textContent = "Searching the corpus and grounding an answer…";
+  $("sources").innerHTML = $("consulted").innerHTML = $("stats").innerHTML = "";
+
+  try {
+    const res = await fetch("/ask", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question }),
+    });
+    if (res.status === 429) throw new Error("Rate limit reached. This is a shared demo — try again shortly.");
+    if (res.status === 503) throw new Error("A service the API depends on is unavailable.");
+    if (!res.ok) throw new Error((await res.json()).detail || `HTTP ${res.status}`);
+    render(await res.json());
+  } catch (err) {
+    $("answer").innerHTML = `<div class="refusal">${err.message}</div>`;
+  } finally {
+    $("go").disabled = false;
+  }
+};
+
+function render(r) {
+  if (r.refused) {
+    // Not an error. The system worked; the corpus does not contain the answer, and
+    // showing the papers it consulted is what separates that from something breaking.
+    $("answer").innerHTML =
+      `<div class="refusal">${r.answer}</div>
+       <p class="note">${r.retrieved.length} papers were consulted and none supported an answer.
+       In a grounded system this is the correct outcome, not a failure.</p>`;
+  } else {
+    $("answer").innerHTML = linkCitations(r.answer, r.sources);
+    if (r.sources.length) {
+      $("sources").innerHTML = "<h3>Sources</h3><ol class='sources'>" + r.sources.map(s =>
+        `<li><a href="${s.url}" target="_blank" rel="noopener">${s.title}</a>
+         <span class="dist">${s.distance.toFixed(3)}</span></li>`).join("") + "</ol>";
+    } else {
+      $("sources").innerHTML = `<p class="note">The answer cited no sources, so it is not grounded.</p>`;
+    }
+  }
+
+  const cited = new Set(r.sources.map(s => s.paper_id));
+  $("consulted").innerHTML =
+    `<summary>All ${r.retrieved.length} papers consulted</summary>` +
+    r.retrieved.map(p => `<div class="row"><span class="dist">${p.distance.toFixed(3)}</span>
+      <span>${cited.has(p.paper_id) ? "●" : "○"}</span>
+      <a href="${p.url}" target="_blank" rel="noopener">${p.title}</a></div>`).join("") +
+    `<p class="note">● cited in the answer &nbsp; ○ retrieved but not used</p>`;
+
+  $("stats").innerHTML =
+    `<div><b>${(r.latency_ms / 1000).toFixed(1)}s</b>latency</div>
+     <div><b>${r.sources.length}/${r.retrieved.length}</b>cited</div>
+     <div><b>${r.retrieved[0].distance.toFixed(3)}</b>closest</div>
+     <div><b>${r.models.generation}</b>over ${r.models.embedding}</div>`;
+}
+</script>
+</body>
+</html>

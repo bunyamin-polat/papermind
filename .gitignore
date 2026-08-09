@@ -21,6 +21,13 @@ NOTES.md
 data/
 .cache/
 
+# Terraform: provider binaries, local state, and the account id.
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+backend.hcl
+
 # Tooling
 .ruff_cache/
 .pytest_cache/

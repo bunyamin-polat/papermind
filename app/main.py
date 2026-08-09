@@ -5,11 +5,15 @@ Run:  uv run uvicorn app.main:app --reload
 """
 
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.responses import FileResponse
 
 from app.api.routes import router
 from retrieval.retriever import _model
+
+STATIC = Path(__file__).parent / "static"
 
 DESCRIPTION = """Ask a question about AI research and get an answer grounded in
 arXiv abstracts, with the papers it came from — or an honest refusal when the corpus
@@ -35,3 +39,14 @@ app = FastAPI(
     lifespan=lifespan,
 )
 app.include_router(router)
+
+
+@app.get("/", include_in_schema=False)
+def index() -> FileResponse:
+    """One page, no build step, served by the same process as the API.
+
+    Streamlit stays for local use but cannot be deployed here: it needs a websocket,
+    and a Lambda Function URL has none. A static page also means one hostname serves
+    both the page and `/ask`, which removes CORS and a preflight on every question.
+    """
+    return FileResponse(STATIC / "index.html")

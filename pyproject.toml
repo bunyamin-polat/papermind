@@ -19,6 +19,10 @@ dependencies = [
     "pydantic-settings>=2.7",
     "requests>=2.32",
     "sentence-transformers>=3.0",
+    # Declared explicitly even though sentence-transformers already pulls it in:
+    # [tool.uv.sources] below only applies to direct dependencies, so a transitive
+    # torch silently ignores the CPU index and drags CUDA into the Linux image.
+    "torch>=2.0",
     "streamlit>=1.40",
     "uvicorn[standard]>=0.32",
 ]
@@ -28,12 +32,26 @@ dev = [
     "ruff>=0.9",
     "pytest>=8.3",
     "httpx>=0.27",
+    "pyyaml>=6.0",
 ]
 
 # This is an application, not a library — nothing here gets built or published,
 # so uv should not look for a build backend.
 [tool.uv]
 package = false
+
+# On Linux, PyPI's default torch wheel bundles CUDA: 2.9 GB of `nvidia` packages,
+# 652 MB of triton, and a 914 MB torch — none of it reachable from a container with
+# no GPU. Embedding here is CPU-only and generation happens in Ollama on the host,
+# so the CPU wheel is not a compromise, it is the correct build. macOS keeps the
+# default wheel, which ships MPS and no CUDA.
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = [{ index = "pytorch-cpu", marker = "sys_platform == 'linux'" }]
 
 [tool.ruff]
 line-length = 100

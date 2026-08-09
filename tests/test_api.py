@@ -14,21 +14,31 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 from core import llm
+from core.config import settings
 from retrieval import answer as answer_module
 from retrieval.prompt import REFUSAL
 from retrieval.retriever import ModelMismatch, Result
 
 
 @pytest.fixture
-def client():
+def client(monkeypatch):
     # Skips rather than fails when Postgres is not up, like the retrieval tests.
     psycopg = pytest.importorskip("psycopg")
     try:
-        from retrieval.retriever import _connect
+        from retrieval.backends.postgres import connect
 
-        _connect().close()
+        connect().close()
     except psycopg.OperationalError as exc:
         pytest.skip(f"database not reachable: {exc}")
+
+    # The rate limit is real and on by default, so a test making a dozen requests from
+    # one address hits it and starts getting 429s in place of whatever it was asserting.
+    # Disabled here and exercised deliberately in test_rate_limit_* below.
+    from app import limits
+
+    monkeypatch.setattr(settings, "rate_limit_per_minute", 0)
+    limits._hits.clear()
+
     with TestClient(app) as c:
         yield c
 
@@ -145,3 +155,51 @@ def test_search_is_never_called_for_an_invalid_request(client, monkeypatch):
     monkeypatch.setattr(answer_module, "search", spy)
     client.post("/ask", json={"question": "x"})
     assert not called, "validation ran after the expensive work"
+
+
+def test_rate_limit_returns_429_with_a_retry_after(client, monkeypatch, fake_llm):
+    """The limit exists because the deployed instance calls a paid model. It is on
+    locally too, where answers are free — a limit first enabled in production is a limit
+    that has never been exercised."""
+    from app import limits
+
+    fake_llm("An answer [1].")
+    monkeypatch.setattr(settings, "rate_limit_per_minute", 3)
+    limits._hits.clear()
+
+    payload = {"question": "what is attention?"}
+    codes = [client.post("/ask", json=payload).status_code for _ in range(4)]
+
+    assert codes[:3] == [200, 200, 200]
+    assert codes[3] == 429
+
+    response = client.post("/ask", json=payload)
+    assert "Retry-After" in response.headers
+
+
+def test_rate_limit_can_be_switched_off(client, monkeypatch, fake_llm):
+    from app import limits
+
+    fake_llm("An answer [1].")
+    monkeypatch.setattr(settings, "rate_limit_per_minute", 0)
+    limits._hits.clear()
+
+    codes = [client.post("/ask", json={"question": "what?"}).status_code for _ in range(6)]
+    assert codes == [200] * 6, codes
+
+
+def test_healthz_is_cheap_and_does_not_call_the_model(client, monkeypatch):
+    """The Lambda adapter polls this before reporting the container ready. If it called
+    the language model, readiness would depend on a third party and take seconds."""
+    def boom(*args, **kwargs):
+        raise AssertionError("/healthz called the language model")
+
+    monkeypatch.setattr(llm, "complete", boom)
+    assert client.get("/healthz").json() == {"status": "ok"}
+
+
+def test_index_page_is_served_by_the_api(client):
+    """One hostname for the page and the API, so there is no CORS preflight per question."""
+    response = client.get("/")
+    assert response.status_code == 200
+    assert "PaperMind" in response.text

@@ -58,6 +58,7 @@ class AskResponse(BaseModel):
 
 class Health(BaseModel):
     status: str
+    backend: str = Field(description="postgres in development, memory when deployed")
     papers: int
     embeddings: int
     embedding_model: str

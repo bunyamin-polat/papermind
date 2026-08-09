@@ -6,10 +6,10 @@ A retrieval-augmented generation service over a corpus of ArXiv CS/AI abstracts.
 
 Runs entirely on your machine with `docker compose up` — using either a local model via Ollama (no API key, no cost) or your own provider key.
 
-> **Status: in development — 9 of 13 steps complete.**
-> A working browser app over the corpus: ask a question, get a grounded cited answer or an
-> honest refusal, and see the papers behind both. Containerisation and deployment are not
-> built yet.
+> **Status: in development — 10 of 13 steps complete.**
+> `docker compose up` gives a working browser app over the corpus: ask a question, get a
+> grounded cited answer or an honest refusal, and see the papers behind both. Cloud
+> deployment and CI are not built yet.
 > No benchmark in this README is estimated or aspirational — numbers appear only after
 > they are measured.
 
@@ -174,7 +174,7 @@ Thirteen steps. Each one ends with something that runs, and this table is update
 | 6 | Refusal — tested "I don't know" path | ✅ |
 | 7 | FastAPI `/ask` endpoint | ✅ |
 | 8 | Streamlit UI | ✅ |
-| 9 | Dockerise the application | ⬜ |
+| 9 | Dockerise the application | ✅ |
 | 10 | Deploy to AWS | ⬜ |
 | 11 | CI/CD | ⬜ |
 | 12 | Measure and publish | ⬜ |
@@ -230,14 +230,42 @@ more than it should.
 
 ## Running it
 
-Three processes: Postgres in Docker, Ollama for generation, and the app.
+```bash
+ollama serve &                       # generation, on the host — see below
+ollama pull qwen3:4b-instruct
+docker compose up -d                 # Postgres, API on :8000, UI on :8501
+```
+
+Then load the corpus once. It is **not** baked into the image — 287 MB of data belongs in a volume,
+not in a layer that goes stale:
 
 ```bash
-docker compose up -d                       # Postgres + pgvector
-ollama serve &                             # local model
-uv run uvicorn app.main:app &              # API on :8000
-uv run streamlit run ui/Home.py            # UI on :8501
+uv run python -m ingestion.fetch --limit 2000   # ~3 min, enough to try it
+uv run python -m ingestion.clean
+uv run python -m ingestion.embed
 ```
+
+Drop `--limit` for the full 30,061-paper corpus: about 20 minutes of arXiv fetching (their API allows
+one request every three seconds) plus 8 minutes of embedding.
+
+**Ollama stays on the host, deliberately.** Docker on macOS cannot reach Metal, so a containerised
+Ollama silently falls back to CPU and answers take minutes instead of seconds — the demo appears hung
+rather than slow. The API reaches back out via `host.docker.internal`, with `extra_hosts` making that
+name resolve on Linux too.
+
+### Image size: 19.4 GB → 3.08 GB
+
+The first build was 19.4 GB. Two causes, both invisible until the number was looked at:
+
+| Cause | Cost |
+|---|--:|
+| PyPI's default `torch` on Linux bundles CUDA — 2.9 GB of `nvidia` packages, 652 MB of triton | ~4.5 GB |
+| A single `RUN chown -R`, which rewrites every file's metadata and duplicates the tree into a new layer | 6.16 GB |
+
+The container has no GPU and never will: embedding is CPU-only and generation happens in Ollama on
+the host. `pyproject.toml` therefore resolves `torch` from PyTorch's CPU index on Linux while macOS
+keeps the default MPS wheel. Ownership is now set by `COPY --chown` as files are written, so nothing
+is rewritten afterwards.
 
 The UI reaches the API over HTTP and never imports from it — `tests/test_ui.py` asserts that by
 parsing the imports. It is an easy boundary to erase by accident, and erasing it would make the API
@@ -388,8 +416,59 @@ badly, exactly at the default:
 | Median | 1.0 ms | 1.2 ms | 1.9 ms | 2.3 ms | **71.5 ms** | 3.4 ms | 3.7 ms | 4.7 ms | 7.3 ms |
 | Plan | index | index | index | index | **seq scan** | index | index | index | index |
 
-Recall@5 was 100% at every value on this corpus, so the configured 100 buys margin rather than
-accuracy. It is pinned in `core/config.py` rather than left to the default.
+Recall@5 measured 100% at every value **on the 12 benchmark queries**, so the configured 100 buys
+margin rather than accuracy. It is pinned in `core/config.py` rather than left to the default.
+
+**That 100% was a property of the query set, not of the index.** Re-measured later against all 34
+evaluation questions, HNSW agrees with exact search on 30 of 34 rankings and 33 of 34 top results —
+96.5% overlap at k=5. HNSW is an approximate index and this is what approximate costs. It went
+unnoticed because twelve queries were not enough to show it, which is the same mistake as reporting
+a hit-rate from a small eval set and believing the third decimal place.
+
+## How this is verified
+
+Thirteen defects have been found in this project so far. **Every one of them exited zero and printed
+plausible output.** None raised an exception, logged a warning, or failed a test. A suite asserting
+on results would have passed for all thirteen, because in every case the results were correct — the
+corpus loaded, the search returned papers, the container answered.
+
+What caught them was looking at something other than the result.
+
+| What was wrong | What it looked like | What caught it |
+|---|---|---|
+| Sampling collapsed each month onto its final day | Right row count, all 12 months present | Day-of-month histogram — 98.3% fell in days 22-31 |
+| The embedding model truncated 26% of abstracts | Vectors written, search returned sensible papers | Tokenising the corpus and comparing to the model's window |
+| The query planner silently stopped using the HNSW index | Identical papers, identical order, 19× slower | `EXPLAIN` |
+| The image shipped 4.5 GB of CUDA it cannot use, plus a 6.16 GB layer from one `chown -R` | Container built, started and answered correctly | Reading the image size, then `docker history` and `du` |
+| Compose passed the host's `OLLAMA_HOST` into the container, where `localhost` is the container | All services up, ports mapped, `curl` returned 200 | `/health` reporting `degraded` — the check itself |
+| A dependency override was ignored because the package was transitive | `uv lock` reported "Resolved 113 packages", twice | Grepping the lock for the index that should have been in it |
+
+Three of the thirteen were in measurement code rather than product code. The instrument is as likely
+to be wrong as the thing it measures: the index benchmark first reported `ef_search=40` as *slower*
+than `ef_search=100` on the same index, which is impossible, and that contradiction is what exposed a
+missing warm-up and a client-side timer.
+
+### What this changes about the tests
+
+Assertions are on mechanism and shape, not on success:
+
+- [`test_query_plan_actually_uses_the_index`](tests/test_retriever.py) runs `EXPLAIN` and asserts the
+  index appears. A sequential scan returns the same papers in the same order — output cannot reveal it.
+- [`test_papers_are_spread_across_the_month`](tests/test_regressions.py) fails if any quarter of the
+  month holds more than 45% of the corpus. Under the broken scheme it was 98.3%.
+- [`test_lock_contains_no_cuda_packages`](tests/test_regressions.py) fails if CUDA returns to the
+  dependency lock, which is the only visible sign that the CPU-wheel override stopped applying.
+- [`test_compose_does_not_interpolate_the_host_ollama_url`](tests/test_regressions.py) fails if the
+  container is handed a URL that resolves to itself.
+- [`test_ui_never_imports_the_backend`](tests/test_ui.py) parses every file in `ui/` and fails on a
+  direct import. The import would work — same repo, same interpreter — which is exactly why a comment
+  saying "don't" was not enough.
+- [`test_search_is_never_called_for_an_invalid_request`](tests/test_api.py) asserts something does
+  *not* happen: that validation runs before the expensive work.
+
+`GET /health` checks the database, the corpus, and whether the language model answers, rather than
+returning `{"status":"ok"}` — which is how the container misconfiguration above was found rather than
+shipped.
 
 ## Metrics
 

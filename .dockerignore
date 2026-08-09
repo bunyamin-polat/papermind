@@ -1,0 +1,23 @@
+# The raw corpus and the per-year checkpoints stay out: large, regenerable, and the
+# wrong thing to version in a layer. The built artifact under data/artifact/ is the
+# exception — Dockerfile.lambda carries it deliberately, because a deployed instance
+# with no database has to get the corpus from somewhere, and a boot that downloads it
+# is a boot that can fail invisibly.
+data/raw/
+data/*.parquet
+
+.venv/
+__pycache__/
+*.py[oc]
+.pytest_cache/
+.ruff_cache/
+
+.git/
+.github/
+
+# Local-only working files.
+.env
+CLAUDE.md
+NOTES.md
+
+.DS_Store

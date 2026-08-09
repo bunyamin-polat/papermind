@@ -32,6 +32,18 @@ class Settings(BaseSettings):
     # scripts/bench_index.py; every other value tested uses the index.
     hnsw_ef_search: int = 100
 
+    # Which retrieval backend serves queries.
+    #
+    #   postgres — pgvector + HNSW. Used while building the corpus, because SQL and
+    #              incremental re-indexing are what make the corpus workable.
+    #   memory   — the whole corpus as a numpy array. Used in deployment, because at
+    #              30k vectors brute force is 2.9 ms against HNSW's 3.7 ms, and choosing
+    #              it removes an RDS instance, a VPC and a NAT gateway (~$45/month).
+    #
+    # See retrieval/backends/base.py.
+    retrieval_backend: str = "postgres"
+    artifact_dir: str = "data/artifact"
+
     # Generation. Ollama is the default so the repo runs with no API key and no
     # cost — which also means prompt iteration, the expensive part of step 5 in
     # wall-clock terms, is free.
@@ -56,6 +68,11 @@ class Settings(BaseSettings):
     llm_max_tokens: int = 600
     llm_temperature: float = 0.0  # grounded answers should not be creative
     llm_timeout_s: int = 120
+
+    # Questions per minute per caller. On by default, including locally where answers
+    # are free — a limit first enabled in production is a limit never exercised.
+    # 0 disables it.
+    rate_limit_per_minute: int = 10
 
     @property
     def database_url(self) -> str:

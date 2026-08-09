@@ -5,13 +5,14 @@ import pytest
 
 from core.config import settings
 from retrieval import retriever
+from retrieval.backends import postgres
 
 
 @pytest.fixture(scope="module")
 def conn():
     psycopg = pytest.importorskip("psycopg")
     try:
-        c = retriever._connect()
+        c = postgres.connect()
     except psycopg.OperationalError as exc:
         pytest.skip(f"database not reachable: {exc}")
     if c.execute("SELECT count(*) FROM embeddings").fetchone()[0] == 0:
@@ -23,12 +24,12 @@ def conn():
 def test_search_sql_filters_by_model():
     """Without the model filter, a corpus embedded twice would return neighbours
     from two different vector spaces mixed together."""
-    sql = " ".join(retriever.SEARCH.split())
+    sql = " ".join(postgres.SEARCH.split())
     assert "WHERE e.model = %s" in sql
 
 
 def test_search_orders_by_distance_not_by_id():
-    sql = " ".join(retriever.SEARCH.split())
+    sql = " ".join(postgres.SEARCH.split())
     assert "ORDER BY e.embedding <=> %s" in sql
 
 
@@ -48,7 +49,7 @@ def test_query_plan_actually_uses_the_index(conn):
     """
     vector = retriever._model().encode("attention mechanism", normalize_embeddings=True)
     rows = conn.execute(
-        "EXPLAIN " + retriever.SEARCH,
+        "EXPLAIN " + postgres.SEARCH,
         (vector, settings.embedding_model, vector, retriever.DEFAULT_K),
     ).fetchall()
     plan = "\n".join(r[0] for r in rows)
@@ -82,4 +83,4 @@ def test_model_mismatch_is_detected(conn, monkeypatch):
     that produces no error — so it is made into one."""
     monkeypatch.setattr(settings, "embedding_model", "some/other-model")
     with pytest.raises(retriever.ModelMismatch):
-        retriever.check_corpus(conn)
+        postgres.check_corpus(conn)

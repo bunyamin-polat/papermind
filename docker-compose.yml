@@ -1,10 +1,14 @@
-# One service for now: Postgres with the pgvector extension compiled in.
-# The app itself gets containerised at step 9 — until then you run it on the host
-# and it talks to this database over the published port.
+# Three processes, one command — plus Ollama, which stays on the host.
+#
+# Ollama is deliberately not a service here. On macOS, Docker cannot reach Metal,
+# so a containerised Ollama silently falls back to CPU and answers take minutes
+# instead of seconds. Keeping it on the host is the difference between a demo that
+# works and one that appears hung. `OLLAMA_HOST` below points back out at the host;
+# `extra_hosts` makes that name resolve on Linux, where Docker does not provide it.
 services:
   db:
-    # Plain `postgres:17` does NOT contain pgvector. This image is the official
-    # Postgres image with the extension built in.
+    # Plain `postgres:17` does NOT contain pgvector. This is the official Postgres
+    # image with the extension built in.
     image: pgvector/pgvector:pg17
     container_name: papermind-db
     restart: unless-stopped
@@ -13,21 +17,77 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
     ports:
-      # host:container — the container always listens on 5432 internally.
+      # host:container — published so `psql` and the ingestion scripts can reach it
+      # from the host. Inside the compose network the API uses `db:5432` instead.
       - "${POSTGRES_PORT:-5434}:5432"
     volumes:
-      # Named volume: the data survives `docker compose down`.
-      # It does NOT survive `docker compose down -v` — that is how you reset.
+      # Named volume: survives `docker compose down`, not `down -v`.
       - pgdata:/var/lib/postgresql/data
-      # Anything in here runs once, on first initialisation of an empty volume.
       - ./db/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      # Lets later services wait for a database that is actually accepting
-      # connections, rather than one whose process has merely started.
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
       retries: 10
+
+  api:
+    build: .
+    container_name: papermind-api
+    restart: unless-stopped
+    environment:
+      # Inside the network Postgres is `db:5432`, never the published host port.
+      # This is the setting that makes a container work from outside and fail from
+      # inside, so it is set explicitly rather than inherited.
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      # Deliberately NOT ${OLLAMA_HOST}. That variable is set in .env to
+      # http://localhost:11434, which is correct when the app runs on the host and
+      # wrong inside a container, where localhost is the container itself. Compose
+      # reads .env, so interpolating it here silently imported the host's value and
+      # broke generation while everything else looked fine. Override with
+      # CONTAINER_OLLAMA_HOST if Ollama lives somewhere else.
+      OLLAMA_HOST: ${CONTAINER_OLLAMA_HOST:-http://host.docker.internal:11434}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3:4b-instruct}
+    extra_hosts:
+      # Docker Desktop provides host.docker.internal; Linux does not.
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      # Startup loads the embedding model, so the first check must not be the one
+      # that decides the container is broken.
+      test: ["CMD", "curl", "-fs", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+
+  ui:
+    build: .
+    container_name: papermind-ui
+    restart: unless-stopped
+    command:
+      - streamlit
+      - run
+      - ui/Home.py
+      - --server.port=8501
+      - --server.address=0.0.0.0
+      - --server.headless=true
+    environment:
+      # Over HTTP by service name — the UI is a client here exactly as it is on a
+      # laptop. Nothing about the boundary changes because they share a network.
+      API_URL: http://api:8000
+    ports:
+      - "8501:8501"
+    depends_on:
+      api:
+        condition: service_started
 
 volumes:
   pgdata:
