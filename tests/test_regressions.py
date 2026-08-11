@@ -146,3 +146,52 @@ def test_no_expected_paper_is_used_twice():
         if line.strip() and json.loads(line)["slice"] == "in_corpus"
     ]
     assert len(expected) == len(set(expected))
+
+
+# --- deployed image boots without a database (ledger #14) ---------------------
+#
+# The first Lambda deploy crashed at import: `Settings` required POSTGRES_USER,
+# POSTGRES_PASSWORD and POSTGRES_DB, and the deployed instance has no database. The
+# Function URL still answered **HTTP 200** with an error payload in the body, so status
+# codes said the deploy was fine and the "cold start" being measured was a crash loop.
+
+
+def test_settings_load_with_no_database_configuration():
+    """What the deployed image does at import time, in one assertion."""
+    from core.config import Settings
+
+    settings_without_db = Settings(_env_file=None, retrieval_backend="memory")
+    assert settings_without_db.retrieval_backend == "memory"
+
+
+def test_postgres_backend_refuses_to_run_unconfigured():
+    """The other half: defaults must not turn a missing password into a silent
+    connection attempt with the wrong credentials."""
+    import core.config as config_module
+    from core.config import Settings
+    from retrieval.backends import postgres
+
+    original = config_module.settings
+    config_module.settings = Settings(_env_file=None, retrieval_backend="postgres")
+    postgres.settings = config_module.settings
+    try:
+        with pytest.raises(postgres.NotConfigured):
+            postgres.connect()
+    finally:
+        config_module.settings = original
+        postgres.settings = original
+
+
+def test_no_cloud_deployment_files_remain():
+    """Deployment was removed deliberately; this stops it growing back by accident.
+
+    The memory backend and `scripts/build_artifact.py` deliberately stay — they were
+    built for a deployed instance but run perfectly well locally, are covered by
+    `test_backend_parity.py`, and carry the measurement that says a dot product beats a
+    database at this corpus size. What went is the cloud itself: Terraform, the Lambda
+    image, and the deploy/destroy/smoke scripts.
+    """
+    gone = ["infra", "slipway.yaml", "Dockerfile.lambda"]
+    gone += [f"scripts/{name}.py" for name in ("deploy", "destroy", "smoke", "_common")]
+    present = [path for path in gone if (ROOT / path).exists()]
+    assert not present, f"cloud deployment files are back: {present}"

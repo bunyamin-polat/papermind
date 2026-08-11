@@ -13,11 +13,15 @@ import re
 import api_client as api
 import streamlit as st
 
+# Written out rather than derived. The first version built each label from the
+# question's second word and produced buttons reading "can", "did", "do" — which
+# rendered perfectly and meant nothing.
 EXAMPLES = [
-    "how can learned noise protect private data sent to a cloud inference service?",
-    "why did keyframe-based monocular SLAM replace filter-based approaches?",
-    "how do large language models behave as agents in detective role-playing games?",
-    "who won the 2018 FIFA World Cup?",  # deliberately unanswerable
+    ("inference privacy", "how can learned noise protect private data sent to a cloud service?"),
+    ("visual SLAM", "why did keyframe-based monocular SLAM replace filter-based approaches?"),
+    ("LLM agents", "how do large language models behave as agents in role-playing games?"),
+    ("traffic forecasting", "how are graph convolutional networks used to forecast traffic?"),
+    ("unanswerable", "who won the 2018 FIFA World Cup?"),
 ]
 
 st.set_page_config(page_title="PaperMind", page_icon="📄", layout="centered")
@@ -62,12 +66,12 @@ with st.sidebar:
         "In the prompt each paper costs about 300 tokens."
     )
 
-question = st.text_input("Ask a question", placeholder=EXAMPLES[0])
+question = st.text_input("Ask a question", placeholder=EXAMPLES[0][1])
 
+st.caption("or try one:")
 cols = st.columns(len(EXAMPLES))
-for col, example in zip(cols, EXAMPLES, strict=True):
-    label = "unanswerable" if "FIFA" in example else example.split()[1][:9]
-    if col.button(label, use_container_width=True):
+for col, (label, example) in zip(cols, EXAMPLES, strict=True):
+    if col.button(label, use_container_width=True, help=example):
         question = example
 
 if question:

@@ -13,9 +13,14 @@ class Settings(BaseSettings):
     # names arrive as real environment variables and this file simply isn't there.
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    postgres_user: str
-    postgres_password: str
-    postgres_db: str
+    # Optional, because the deployed instance has no database — it serves the corpus
+    # from memory. Required fields here crashed the first Lambda deploy at import time,
+    # before a single line of application code ran. The Postgres backend validates them
+    # when it is actually the backend in use, which is the only place their absence is
+    # an error rather than a configuration.
+    postgres_user: str = "papermind"
+    postgres_password: str = ""
+    postgres_db: str = "papermind"
     postgres_host: str = "localhost"
     postgres_port: int = 5434
 

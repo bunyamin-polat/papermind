@@ -29,7 +29,22 @@ class ModelMismatch(RuntimeError):
     """
 
 
+class NotConfigured(RuntimeError):
+    """This backend was selected but has no credentials.
+
+    The database settings carry defaults so the memory backend can run without them.
+    That convenience has to be paid for here: selecting Postgres without a password is a
+    configuration error, and it should say so rather than fail later inside psycopg with
+    a message about authentication.
+    """
+
+
 def connect() -> psycopg.Connection:
+    if not settings.postgres_password:
+        raise NotConfigured(
+            "RETRIEVAL_BACKEND=postgres but POSTGRES_PASSWORD is empty. "
+            "Set it, or use RETRIEVAL_BACKEND=memory with a built artifact."
+        )
     conn = psycopg.connect(settings.database_url)
     register_vector(conn)
     # Explicit, never left to the server default. pgvector's default ef_search is 40,

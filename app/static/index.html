@@ -45,7 +45,7 @@
   <p class="sub">Questions about AI research, answered from arXiv abstracts — with the papers.</p>
 
   <form id="ask">
-    <input id="q" autocomplete="off" placeholder="how can learned noise protect private data?">
+    <input id="q" autocomplete="off" placeholder="how can learned noise protect private data sent to a cloud service?">
     <button id="go" type="submit">Ask</button>
   </form>
   <div class="examples" id="examples"></div>
@@ -59,18 +59,21 @@
 </main>
 
 <script>
+// Labels are written, not derived. Deriving them from the question's wording is how
+// the first version ended up with buttons reading "can", "did" and "do".
 const EXAMPLES = [
-  "how can learned noise protect private data sent to a cloud inference service?",
-  "how do large language models behave as agents in detective role-playing games?",
-  "how are graph convolutional networks used to forecast traffic?",
-  "who won the 2018 FIFA World Cup?",
+  ["inference privacy",  "how can learned noise protect private data sent to a cloud service?"],
+  ["visual SLAM",        "why did keyframe-based monocular SLAM replace filter-based approaches?"],
+  ["LLM agents",         "how do large language models behave as agents in role-playing games?"],
+  ["traffic forecasting","how are graph convolutional networks used to forecast traffic?"],
+  ["unanswerable",       "who won the 2018 FIFA World Cup?"],
 ];
 
 const $ = id => document.getElementById(id);
 
-EXAMPLES.forEach(text => {
+EXAMPLES.forEach(([label, text]) => {
   const b = document.createElement("button");
-  b.textContent = text === EXAMPLES[3] ? "an unanswerable one" : text.split(" ").slice(2, 5).join(" ");
+  b.textContent = label;
   b.title = text;
   b.onclick = () => { $("q").value = text; $("ask").requestSubmit(); };
   $("examples").append(b);

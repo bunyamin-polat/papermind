@@ -1,15 +1,29 @@
 # PaperMind
 
+![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)
+![Elasticsearch](https://img.shields.io/badge/Elasticsearch-005571?style=for-the-badge&logo=elasticsearch&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)
+![Streamlit](https://img.shields.io/badge/Streamlit-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white)
+![Hugging Face](https://img.shields.io/badge/Hugging%20Face-FFD21E?style=for-the-badge&logo=huggingface&logoColor=white)
+![OpenAI](https://img.shields.io/badge/OpenAI-412991?style=for-the-badge&logo=openai&logoColor=white)
+![Ollama](https://img.shields.io/badge/Ollama-000000?style=for-the-badge&logo=ollama&logoColor=white)
+![Pydantic](https://img.shields.io/badge/Pydantic-E92063?style=for-the-badge&logo=pydantic&logoColor=white)
+![uv](https://img.shields.io/badge/uv-DE5FE9?style=for-the-badge&logo=uv&logoColor=white)
+
 **Ask a question about AI research, get an answer grounded in real papers — with the sources it came from.**
 
 A retrieval-augmented generation service over a corpus of ArXiv CS/AI abstracts. Semantic search finds the relevant passages, an LLM answers from those passages only, and every answer carries its citations. When the corpus does not support an answer, it says so instead of guessing.
 
 Runs entirely on your machine with `docker compose up` — using either a local model via Ollama (no API key, no cost) or your own provider key.
 
-> **Status: in development — 10 of 13 steps complete.**
+> **Status: in development — the dense baseline is complete; hybrid retrieval is the remaining
+> release gate.**
 > `docker compose up` gives a working browser app over the corpus: ask a question, get a
-> grounded cited answer or an honest refusal, and see the papers behind both. Cloud
-> deployment and CI are not built yet.
+> grounded cited answer or an honest refusal, and see the papers behind both.
+> **This is a local-first project.** It runs entirely on one machine and is meant to; there
+> is no hosted instance and no live URL, by choice rather than by omission.
 > No benchmark in this README is estimated or aspirational — numbers appear only after
 > they are measured.
 
@@ -151,15 +165,15 @@ papermind/
 ├── app/           # FastAPI: POST /ask
 ├── ui/            # Streamlit front end
 ├── scripts/       # operational checks
-├── db/init/       # SQL that runs on first database creation
-└── infra/         # Terraform
+└── db/init/       # SQL that runs on first database creation
 ```
 
 `ingestion/` and `retrieval/` are separate packages because they run at different times and rates. Keeping them apart is what stops the bulk-load path and the per-request path from bleeding into each other.
 
 ## Project status
 
-Thirteen steps. Each one ends with something that runs, and this table is updated when it does.
+Ten build steps done, plus the hybrid retrieval gate that remains. Each one ends with something that
+runs.
 
 ✅ done · 🟡 in progress · ⬜ not started
 
@@ -175,9 +189,8 @@ Thirteen steps. Each one ends with something that runs, and this table is update
 | 7 | FastAPI `/ask` endpoint | ✅ |
 | 8 | Streamlit UI | ✅ |
 | 9 | Dockerise the application | ✅ |
-| 10 | Deploy to AWS | ⬜ |
-| 11 | CI/CD | ⬜ |
-| 12 | Measure and publish | ⬜ |
+| 10 | **Hybrid retrieval — Elasticsearch BM25 + RRF; compare dense / lexical / fused** | ⬜ |
+| 11 | Measure and publish | ⬜ |
 
 **Works today:** PostgreSQL 17.10 with pgvector 0.8.6 comes up via Docker Compose. The ingestion
 pipeline queries the arXiv API, samples across 2015-2026, cleans and deduplicates, and loads
@@ -185,6 +198,22 @@ pipeline queries the arXiv API, samples across 2015-2026, cleans and deduplicate
 three commands are idempotent. Semantic search returns sensible neighbours in **3.7 ms** at full
 recall, and out-of-domain questions land measurably further away — cosine distance 0.18 for
 "attention mechanism in transformers" against 0.45 for "how do you bake sourdough bread".
+
+**Release contract:** this is a single PaperMind release, not a v1 followed by a v2. The current
+dense-only implementation is its measured baseline. Docker Compose must also run Elasticsearch; BM25,
+dense and RRF-fused retrieval must be measured over the same golden questions; and the selected
+backend must work end to end before the retrieval work is called done.
+
+**Two retrieval backends, and why.** Queries are served either from PostgreSQL or from a frozen
+in-memory artifact, chosen by `RETRIEVAL_BACKEND`. At this corpus size an exact in-memory search over
+30,061 x 768 measured **2.9 ms** against **3.7 ms** for pgvector with an HNSW index — the database is
+not the faster reader. What Postgres genuinely buys is everything *around* a query: SQL, incremental
+re-indexing, adding papers without rebuilding anything. So Postgres is the backend while the corpus is
+being built, and the artifact is for serving a corpus that has stopped changing.
+
+The risk of two implementations is that they drift apart while both keep returning plausible papers,
+so `tests/test_backend_parity.py` runs the evaluation questions through both and asserts identical
+results.
 
 ## Retrieval
 
@@ -216,8 +245,21 @@ an identifier carries no meaning to embed. A keyword index finds it in one looku
 **Negation.** Asked for "papers that do NOT use transformers", the second result is *Simplifying
 Transformer Blocks*. Embeddings have no representation for negation: "not X" lands next to "X".
 
-Both are the standard argument for hybrid retrieval, which is why BM25 fusion sits at the top of the
-roadmap rather than in v1. Neither is hypothetical here — they are what this corpus actually does.
+Both are the standard argument for hybrid retrieval. Neither is hypothetical here — they are what
+this corpus actually does — so hybrid retrieval is a required part of the single release rather than
+a later version.
+
+**The release answers them with Elasticsearch beside pgvector, not instead of it.** Dense retrieval
+stays in Postgres; a lexical BM25 index goes into Elasticsearch; the two ranked lists fuse with
+Reciprocal Rank Fusion. Fusion happens on **ranks, not scores** — a cosine distance and a BM25 score
+are different units and averaging them is meaningless.
+
+The alternative was Postgres' own full-text search, which would have kept everything in one
+datastore. It was not chosen: a real lexical engine is what production systems put in front of this
+problem, `2406.06538` is exactly the query BM25 exists for, and running the two engines side by side
+is what makes the comparison publishable — dense alone, lexical alone, and fused, over the same
+questions. A hybrid result without the two arms measured separately is an assertion. This work is
+done and accepted locally before the cloud image is rebuilt and deployed.
 
 ### Two safeguards
 
@@ -427,9 +469,9 @@ a hit-rate from a small eval set and believing the third decimal place.
 
 ## How this is verified
 
-Thirteen defects have been found in this project so far. **Every one of them exited zero and printed
+Fourteen defects have been found in this project so far. **Every one of them exited zero and printed
 plausible output.** None raised an exception, logged a warning, or failed a test. A suite asserting
-on results would have passed for all thirteen, because in every case the results were correct — the
+on results would have passed for all fourteen, because in every case the results were correct — the
 corpus loaded, the search returned papers, the container answered.
 
 What caught them was looking at something other than the result.
@@ -442,8 +484,9 @@ What caught them was looking at something other than the result.
 | The image shipped 4.5 GB of CUDA it cannot use, plus a 6.16 GB layer from one `chown -R` | Container built, started and answered correctly | Reading the image size, then `docker history` and `du` |
 | Compose passed the host's `OLLAMA_HOST` into the container, where `localhost` is the container | All services up, ports mapped, `curl` returned 200 | `/health` reporting `degraded` — the check itself |
 | A dependency override was ignored because the package was transitive | `uv lock` reported "Resolved 113 packages", twice | Grepping the lock for the index that should have been in it |
+| Settings required database credentials at import, so the memory backend could not start without a database it never uses | Process exited before any application code ran; the error named Pydantic, not the cause | Starting the app with the database settings unset |
 
-Three of the thirteen were in measurement code rather than product code. The instrument is as likely
+Three of the fourteen were in measurement code rather than product code. The instrument is as likely
 to be wrong as the thing it measures: the index benchmark first reported `ef_search=40` as *slower*
 than `ef_search=100` on the same index, which is impossible, and that contradiction is what exposed a
 missing warm-up and a client-side timer.
@@ -465,6 +508,10 @@ Assertions are on mechanism and shape, not on success:
   saying "don't" was not enough.
 - [`test_search_is_never_called_for_an_invalid_request`](tests/test_api.py) asserts something does
   *not* happen: that validation runs before the expensive work.
+- [`test_settings_load_with_no_database_configuration`](tests/test_regressions.py) exercises the
+  deployed image's import path, while
+  [`test_postgres_backend_refuses_to_run_unconfigured`](tests/test_regressions.py) keeps the local
+  backend strict when it is explicitly selected.
 
 `GET /health` checks the database, the corpus, and whether the language model answers, rather than
 returning `{"status":"ok"}` — which is how the container misconfiguration above was found rather than
@@ -509,4 +556,3 @@ per-question results:
 cosine distance 0.112-0.290; for a question the corpus cannot answer, 0.411-0.506. The gap of 0.121
 with no overlap is what makes a distance-based refusal threshold viable at step 6 — measured rather
 than assumed.
-

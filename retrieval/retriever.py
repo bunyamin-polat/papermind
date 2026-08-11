@@ -13,13 +13,14 @@ import functools
 from core.config import settings
 from retrieval.backends.base import Result
 from retrieval.backends.memory import ArtifactMismatch, ArtifactMissing, MemoryBackend
-from retrieval.backends.postgres import ModelMismatch, PostgresBackend
+from retrieval.backends.postgres import ModelMismatch, NotConfigured, PostgresBackend
 
 __all__ = [
     "DEFAULT_K",
     "ArtifactMismatch",
     "ArtifactMissing",
     "ModelMismatch",
+    "NotConfigured",
     "Result",
     "backend",
     "health",
