@@ -20,8 +20,8 @@ citation. When the corpus cannot answer, it says so instead of guessing.
 Runs entirely on your machine with `docker compose up`, on a local model via Ollama — no API key, no
 cost. There is no hosted instance: this is a project you run, not one you visit.
 
-> **Status: 10 of 12 steps.** The dense baseline is complete and measured. Hybrid retrieval
-> (Elasticsearch BM25 + RRF) is the remaining work before deployment.
+> **Status: 11 of 12 steps.** Hybrid retrieval is built and measured; the comparison table below is
+> the result. Deployment is what remains.
 > No number in this README is estimated — measurements appear only after they are taken.
 
 ---
@@ -32,22 +32,26 @@ Measured against 108 questions — 100 answerable from the corpus with the expec
 6 the corpus provably cannot answer, 2 targeting known weak spots. Full detail in
 [docs/metrics.md](docs/metrics.md).
 
-| Metric | Value |
-|---|---|
-| Corpus | 90,088 arXiv papers, 2015-2026 |
-| **Retrieval hit-rate@5** | **79%** |
-| hit-rate@1 · @10 | 62% · 85% |
-| MRR@5 | 0.688 |
-| Query latency | 52 ms median · 95 ms p95 |
-| Refusal on out-of-corpus questions | **100%** |
-| Cost per query | $0 — everything runs locally |
+| Configuration | hit-rate@5 | MRR | Latency (median) |
+|---|--:|--:|--:|
+| **Hybrid — BM25 + dense, fused with RRF** | **91%** | **0.744** | 83 ms |
+| Dense only — pgvector + HNSW | 86% | 0.742 | 58 ms |
+| Lexical only — Elasticsearch BM25 | 67% | 0.529 | — |
+
+90,088 arXiv papers · refusal on out-of-corpus questions **100%** · **$0 per query**, everything
+runs locally.
+
+**Lexical alone is 19 points worse than dense, and fusing them still gains 5 points over dense.**
+That is the case for rank fusion in one line: the two arms fail on different questions, so agreement
+between them carries information neither ranking has alone. A hybrid result published without both
+arms measured separately is an assertion — these are the arms.
+
+**MRR barely moved** (0.742 → 0.744) while hit-rate gained 5 points. Fusion is finding papers dense
+missed, not reordering the ones it already had. That gap is what reranking would close, and it is now
+a measured opening rather than a received idea.
 
 **Refusal is measured, not asserted.** For a question the corpus can answer, the nearest paper sits at
 cosine distance 0.091-0.265; for one it cannot, 0.402-0.503. No overlap, at 3× the corpus size.
-
-**The gap between hit-rate@5 (79%) and MRR (0.688) is the case for reranking** — the right paper is
-usually retrieved, and usually not first. Hybrid retrieval is the next step and this is the baseline
-it has to beat.
 
 > **Generation numbers are not on this table yet.** End-to-end citation accuracy, the small-versus-large
 > model comparison and the invented-citation count were all measured against the previous 30,061-paper
@@ -67,7 +71,7 @@ cd papermind
 cp .env.example .env
 
 uv sync
-docker compose up -d                              # Postgres, API on :8000, UI on :8501
+docker compose up -d                              # Postgres, Elasticsearch, API :8000, UI :8501
 uv run python -m scripts.check_db                 # should print "step 0 OK"
 ```
 
@@ -75,9 +79,13 @@ Then load the corpus — it is fetched, not committed:
 
 ```bash
 uv run python -m ingestion.fetch --limit 2000     # ~3 min, enough to try it
-uv run python -m ingestion.clean
-uv run python -m ingestion.embed
+uv run python -m ingestion.clean                  # → Postgres
+uv run python -m ingestion.embed                  # → pgvector, the dense arm
+uv run python -m ingestion.index_lexical          # → Elasticsearch, the BM25 arm
 ```
+
+The lexical index is derived from Postgres and rebuilt in seconds — 90,088 papers indexed in 9.1s —
+so it is never the thing to back up.
 
 Drop `--limit` for the full corpus: about 20 minutes of arXiv fetching (their API allows one request
 every three seconds) plus 8 minutes of embedding. All three commands are idempotent — an interrupted
@@ -126,7 +134,8 @@ Every row is a decision, the alternative that was rejected, and the evidence tha
 | No LangChain | `RetrievalQA` | The chain is four function calls. A framework would add a dependency and hide the part worth understanding |
 | Citations by **position** | Asking the model for the arXiv id | A model shown no identifier cannot invent one. 0 fabrications in 68 answers ([docs/generation.md](docs/generation.md)) |
 | Refusal as one exact sentence | "Say you don't know" | An exact string is testable; an instruction to be honest is not |
-| Elasticsearch BM25 + RRF *(next)* | Dense retrieval alone | Two measured failures: the identifier `2406.06538` is in the corpus and **not in the top 20**, and "papers that do NOT use transformers" returns *Simplifying Transformer Blocks* ([docs/retrieval.md](docs/retrieval.md)) |
+| Elasticsearch BM25 + RRF | Dense retrieval alone | Dense cannot find an arXiv identifier — it carries no meaning to embed. Fusing the two arms gained 5 points over dense ([docs/retrieval.md](docs/retrieval.md)) |
+| Fusion on **ranks** | Averaging the two scores | A cosine distance and a BM25 score are different units. Averaging them produces a number that means nothing and still looks like an ordering |
 
 ## How this is verified
 

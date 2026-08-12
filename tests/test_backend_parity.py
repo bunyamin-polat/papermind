@@ -18,6 +18,7 @@ import numpy as np
 import pytest
 
 from core.config import settings
+from retrieval.backends.base import Query
 
 ROOT = Path(__file__).parent.parent
 K = 5
@@ -93,7 +94,7 @@ def test_memory_backend_is_exact(backends, questions, vectors):
 
     for question, vector in zip(questions, vectors, strict=True):
         exact = _exact_search(vector)
-        from_memory = [r.paper_id for r in memory.search(vector, K)]
+        from_memory = [r.paper_id for r in memory.search(Query(text=question, vector=vector), K)]
         if exact != from_memory:
             disagreements.append((question, exact, from_memory))
 
@@ -117,7 +118,7 @@ def test_hnsw_approximation_stays_within_bounds(backends, questions, vectors):
 
     for vector in vectors:
         exact = _exact_search(vector)
-        approx = [r.paper_id for r in pg.search(vector, K)]
+        approx = [r.paper_id for r in pg.search(Query(text="", vector=vector), K)]
         same_top1 += exact[0] == approx[0]
         overlap += len(set(exact) & set(approx)) / K
 
@@ -131,8 +132,8 @@ def test_both_backends_report_the_same_distances(backends, vectors):
     pg, memory = backends
 
     for vector in vectors[:10]:
-        from_pg = [r.distance for r in pg.search(vector, K)]
-        from_memory = [r.distance for r in memory.search(vector, K)]
+        from_pg = [r.distance for r in pg.search(Query(text="", vector=vector), K)]
+        from_memory = [r.distance for r in memory.search(Query(text="", vector=vector), K)]
         assert np.allclose(from_pg, from_memory, atol=1e-5), (
             f"distances differ: {from_pg} vs {from_memory}"
         )

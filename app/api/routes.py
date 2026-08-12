@@ -52,7 +52,7 @@ def post_ask(request: AskRequest) -> AskResponse:
                 paper_id=source.paper_id,
                 title=" ".join(source.title.split()),
                 url=source.url,
-                distance=round(source.distance, 4),
+                distance=round(source.distance, 4) if source.distance is not None else None,
             )
             for marker, source in zip(markers, answer.sources, strict=True)
         ],
@@ -61,7 +61,7 @@ def post_ask(request: AskRequest) -> AskResponse:
                 paper_id=r.paper_id,
                 title=" ".join(r.title.split()),
                 url=r.url,
-                distance=round(r.distance, 4),
+                distance=round(r.distance, 4) if r.distance is not None else None,
             )
             for r in answer.retrieved
         ],

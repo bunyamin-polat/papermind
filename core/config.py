@@ -37,16 +37,25 @@ class Settings(BaseSettings):
     # scripts/bench_index.py; every other value tested uses the index.
     hnsw_ef_search: int = 100
 
-    # Which retrieval backend serves queries.
+    # Which retrieval strategy serves queries. Measured on the same 100 questions,
+    # 90,088 papers — the default is the winner, not a preference:
     #
-    #   postgres — pgvector + HNSW. Used while building the corpus, because SQL and
-    #              incremental re-indexing are what make the corpus workable.
-    #   memory   — the whole corpus as a numpy array. Used in deployment, because at
-    #              30k vectors brute force is 2.9 ms against HNSW's 3.7 ms, and choosing
-    #              it removes an RDS instance, a VPC and a NAT gateway (~$45/month).
+    #   hybrid   — RRF over the two below.        hit-rate@5 91%, MRR 0.744, 83 ms
+    #   postgres — pgvector + HNSW, dense only.   hit-rate@5 86%, MRR 0.742, 58 ms
+    #   lexical  — Elasticsearch BM25 only.       hit-rate@5 67%, MRR 0.529
+    #   memory   — the corpus as a numpy array; dense, no database. At this size
+    #              brute force is 2.9 ms against HNSW's 3.7 ms.
     #
-    # See retrieval/backends/base.py.
-    retrieval_backend: str = "postgres"
+    # Lexical alone is 19 points *worse* than dense and fusing them still gains 5
+    # over dense. That is the whole argument for RRF: the two arms fail on
+    # different questions, so agreement between them carries information that
+    # neither ranking has on its own.
+    #
+    # `hybrid` needs Elasticsearch. `postgres` and `memory` do not, which is why
+    # they remain the fallback rather than being deleted.
+    #
+    # See retrieval/backends/base.py and retrieval/backends/hybrid.py.
+    retrieval_backend: str = "hybrid"
     artifact_dir: str = "data/artifact"
 
     # Generation. Ollama is the default so the repo runs with no API key and no
@@ -73,6 +82,12 @@ class Settings(BaseSettings):
     llm_max_tokens: int = 600
     llm_temperature: float = 0.0  # grounded answers should not be creative
     llm_timeout_s: int = 120
+
+    # Elasticsearch — the BM25 half of hybrid retrieval. Same shape as the
+    # database settings: the host differs between the laptop and the compose
+    # network, so it is configuration rather than a constant.
+    elastic_host: str = "http://localhost:9200"
+    elastic_timeout_s: int = 30
 
     # Questions per minute per caller. On by default, including locally where answers
     # are free — a limit first enabled in production is a limit never exercised.

@@ -16,7 +16,7 @@ from pathlib import Path
 import numpy as np
 
 from core.config import settings
-from retrieval.backends.base import Result
+from retrieval.backends.base import Query, Result
 
 ARTIFACT_DIR = Path(settings.artifact_dir)
 VECTORS = "vectors.npy"
@@ -67,13 +67,13 @@ def _load(directory: str = None):
 class MemoryBackend:
     name = "memory"
 
-    def search(self, vector, k: int) -> list[Result]:
+    def search(self, query: Query, k: int) -> list[Result]:
         vectors, papers, _ = _load()
-        query = np.asarray(vector, dtype=np.float32)
+        vector = np.asarray(query.vector, dtype=np.float32)
 
         # Both sides are normalised, so the dot product is cosine similarity and
         # `1 - similarity` is the same distance pgvector's `<=>` returns.
-        similarity = vectors @ query
+        similarity = vectors @ vector
 
         # argpartition finds the top k without sorting 30,000 elements; only the k
         # survivors are ordered.

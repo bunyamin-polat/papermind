@@ -31,14 +31,22 @@ class Source(BaseModel):
     paper_id: str
     title: str
     url: str
-    distance: float
+    #: Cosine distance, or null. A paper the lexical arm found and the dense arm
+    #: did not has no distance — BM25 does not produce one, and computing it after
+    #: the fact would mean an extra embedding lookup per hit to fill in a number
+    #: nothing ranks by. Null is the honest value.
+    distance: float | None = None
 
 
 class RetrievedPaper(BaseModel):
     paper_id: str
     title: str
     url: str
-    distance: float
+    #: Cosine distance, or null. A paper the lexical arm found and the dense arm
+    #: did not has no distance — BM25 does not produce one, and computing it after
+    #: the fact would mean an extra embedding lookup per hit to fill in a number
+    #: nothing ranks by. Null is the honest value.
+    distance: float | None = None
 
 
 class Models(BaseModel):

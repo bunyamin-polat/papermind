@@ -13,6 +13,17 @@ import re
 import api_client as api
 import streamlit as st
 
+
+def _distance(paper: dict) -> str:
+    """How close the dense arm judged this paper, or why there is no number.
+
+    Under hybrid retrieval a paper can arrive from BM25 alone, and BM25 has no
+    notion of distance. Showing "lexical" rather than a dash says which arm found
+    it, which is the more useful half of what the missing number means.
+    """
+    value = paper.get("distance")
+    return f"distance {value:.3f}" if value is not None else "lexical match"
+
 # Written out rather than derived. The first version built each label from the
 # question's second word and produced buttons reading "can", "did", "do" — which
 # rendered perfectly and meant nothing.
@@ -98,7 +109,7 @@ if question:
             for source in result["sources"]:
                 st.markdown(
                     f"**[{source['marker']}]** [{source['title']}]({source['url']})  \n"
-                    f"<span style='color:gray'>distance {source['distance']:.3f}</span>",
+                    f"<span style='color:gray'>{_distance(source)}</span>",
                     unsafe_allow_html=True,
                 )
         else:
@@ -109,14 +120,14 @@ if question:
         for paper in result["retrieved"]:
             mark = "●" if paper["paper_id"] in cited else "○"
             st.markdown(
-                f"{mark} `{paper['distance']:.3f}` [{paper['title']}]({paper['url']})"
+                f"{mark} `{_distance(paper)}` [{paper['title']}]({paper['url']})"
             )
         st.caption("● cited in the answer  ○ retrieved but not used")
 
     a, b, c = st.columns(3)
     a.metric("Latency", f"{result['latency_ms'] / 1000:.1f}s")
     b.metric("Cited", f"{len(result['sources'])}/{len(result['retrieved'])}")
-    c.metric("Closest", f"{result['retrieved'][0]['distance']:.3f}")
+    c.metric("Closest", _distance(result["retrieved"][0]))
     st.caption(
         f"Answered by `{result['models']['generation']}` over embeddings from "
         f"`{result['models']['embedding']}`. Runs locally; costs nothing."

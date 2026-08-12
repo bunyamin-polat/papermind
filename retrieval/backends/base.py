@@ -26,19 +26,40 @@ from typing import Protocol
 
 
 @dataclass(frozen=True)
+class Query:
+    """A question in both the forms a backend might need.
+
+    Dense search wants the vector; BM25 wants the words. Carrying both means the
+    embedding is computed once per question rather than once per backend, and a
+    hybrid backend can hand the same object to each arm without knowing which
+    half either of them will use.
+    """
+
+    text: str
+    vector: object  # np.ndarray, kept loose so this module imports no numpy
+
+
+@dataclass(frozen=True)
 class Result:
     paper_id: str
     title: str
     abstract: str
     url: str
-    distance: float  # cosine distance: 0 is identical, 2 is opposite
+
+    #: Cosine distance: 0 is identical, 2 is opposite. Dense backends only.
+    distance: float | None = None
+
+    #: Whatever the backend ranks by — a BM25 score, an RRF score. **Not
+    #: comparable across backends**, which is the whole reason fusion happens on
+    #: ranks rather than on these numbers.
+    score: float | None = None
 
 
 class Backend(Protocol):
-    """Both backends implement exactly this."""
+    """Every retrieval strategy implements exactly this."""
 
-    def search(self, vector, k: int) -> list[Result]:
-        """The k nearest papers to an already-embedded query, closest first."""
+    def search(self, query: Query, k: int) -> list[Result]:
+        """The k best papers for a question, best first."""
         ...
 
     def health(self) -> dict:

@@ -59,7 +59,14 @@ def test_query_plan_actually_uses_the_index(conn):
 def test_search_returns_k_results_closest_first(conn):
     results = retriever.search("neural machine translation", k=5)
     assert len(results) == 5
-    assert [r.distance for r in results] == sorted(r.distance for r in results)
+    # Ordering is by whatever the configured backend ranks by. Dense returns
+    # ascending distance; hybrid returns descending RRF score and its distances
+    # are in no particular order — asserting distance order here would be
+    # asserting that the default backend is dense, which it is not.
+    if results[0].score is not None:
+        assert [r.score for r in results] == sorted((r.score for r in results), reverse=True)
+    else:
+        assert [r.distance for r in results] == sorted(r.distance for r in results)
 
 
 def test_every_result_carries_a_resolvable_citation(conn):

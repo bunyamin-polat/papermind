@@ -100,11 +100,26 @@ def test_k_controls_how_many_papers_are_consulted(client, fake_llm):
     assert len(body["retrieved"]) == 3
 
 
-def test_distances_increase_down_the_retrieved_list(client, fake_llm):
+def test_retrieved_is_ordered_best_first_and_survives_a_missing_distance(client, fake_llm):
+    """`retrieved` is in rank order, and a null distance does not break the payload.
+
+    This replaced an assertion that distances increase down the list. That was
+    true of dense retrieval and is not true of hybrid: the list is ordered by
+    fused rank, and a paper the lexical arm found alone carries no distance at
+    all. Serialising that as null is deliberate — inventing a number would mean
+    an extra embedding lookup per hit to fill in a field nothing ranks by.
+    """
     fake_llm("An answer [1].")
     body = client.post("/ask", json={"question": "what is attention?"}).json()
-    distances = [r["distance"] for r in body["retrieved"]]
-    assert distances == sorted(distances)
+    retrieved = body["retrieved"]
+
+    assert retrieved, "a question about attention should retrieve something"
+    for item in retrieved:
+        assert item["distance"] is None or 0.0 <= item["distance"] <= 2.0
+
+    dense_only = [r["distance"] for r in retrieved if r["distance"] is not None]
+    if len(dense_only) == len(retrieved):
+        assert dense_only == sorted(dense_only)
 
 
 def test_llm_down_is_503_not_500(client, monkeypatch):

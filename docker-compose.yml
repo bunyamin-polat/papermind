@@ -30,6 +30,36 @@ services:
       timeout: 5s
       retries: 10
 
+  search:
+    # BM25, the lexical half of hybrid retrieval. Dense search is semantically
+    # strong and lexically blind: asked for the identifier `2406.06538`, which is
+    # in this corpus, it does not return it in the top 20. A keyword index finds
+    # it in one lookup.
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.15.3
+    container_name: papermind-search
+    restart: unless-stopped
+    environment:
+      # Single node, no security. This is a local index over public abstracts
+      # that is rebuilt from Postgres in minutes — there is nothing here worth
+      # a password, and TLS on localhost would only be ceremony.
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      # Elasticsearch defaults to a heap sized from total system RAM, which on a
+      # 32 GB machine is 16 GB it does not need for 90,088 short documents.
+      ES_JAVA_OPTS: "-Xms1g -Xmx1g"
+    ports:
+      - "${ELASTIC_PORT:-9200}:9200"
+    volumes:
+      - esdata:/usr/share/elasticsearch/data
+    healthcheck:
+      # `yellow` is the healthy state for a single node: every index has a
+      # replica it can never place, so `green` never arrives and waiting for it
+      # would hang the stack forever.
+      test: ["CMD-SHELL", "curl -sf localhost:9200/_cluster/health | grep -qE '(green|yellow)'"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
   api:
     build: .
     container_name: papermind-api
@@ -58,6 +88,11 @@ services:
       - "8000:8000"
     depends_on:
       db:
+        condition: service_healthy
+      # The default backend is hybrid, so an API that starts before the index is
+      # reachable answers its first queries from dense alone and reports itself
+      # healthy while doing it.
+      search:
         condition: service_healthy
     healthcheck:
       # Startup loads the embedding model, so the first check must not be the one
@@ -91,3 +126,4 @@ services:
 
 volumes:
   pgdata:
+  esdata:

@@ -11,7 +11,9 @@ See `retrieval/backends/base.py` for why there are two.
 import functools
 
 from core.config import settings
-from retrieval.backends.base import Result
+from retrieval.backends.base import Query, Result
+from retrieval.backends.hybrid import HybridBackend
+from retrieval.backends.lexical import LexicalBackend, SearchUnavailable
 from retrieval.backends.memory import ArtifactMismatch, ArtifactMissing, MemoryBackend
 from retrieval.backends.postgres import ModelMismatch, NotConfigured, PostgresBackend
 
@@ -21,6 +23,7 @@ __all__ = [
     "ArtifactMissing",
     "ModelMismatch",
     "NotConfigured",
+    "SearchUnavailable",
     "Result",
     "backend",
     "health",
@@ -40,7 +43,17 @@ __all__ = [
 # rank 6 — choosing k for them would be fitting to this particular set of questions.
 DEFAULT_K = 5
 
-_BACKENDS = {"postgres": PostgresBackend, "memory": MemoryBackend}
+def _hybrid() -> "HybridBackend":
+    """Dense over Postgres, lexical over Elasticsearch, fused on ranks."""
+    return HybridBackend(dense=PostgresBackend(), lexical=LexicalBackend())
+
+
+_BACKENDS = {
+    "postgres": PostgresBackend,
+    "memory": MemoryBackend,
+    "lexical": LexicalBackend,
+    "hybrid": _hybrid,
+}
 
 
 @functools.lru_cache(maxsize=1)
@@ -64,9 +77,9 @@ def _model():
 
 
 def search(question: str, k: int = DEFAULT_K) -> list[Result]:
-    """The k nearest papers to `question`, closest first."""
+    """The k best papers for `question`, best first."""
     vector = _model().encode(question, normalize_embeddings=True)
-    return backend().search(vector, k)
+    return backend().search(Query(text=question, vector=vector), k)
 
 
 def health() -> dict:

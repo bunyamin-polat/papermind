@@ -9,7 +9,7 @@ import psycopg
 from pgvector.psycopg import register_vector
 
 from core.config import settings
-from retrieval.backends.base import Result
+from retrieval.backends.base import Query, Result
 
 SEARCH = """
     SELECT p.id, p.title, p.abstract, p.url, e.embedding <=> %s AS distance
@@ -69,7 +69,8 @@ def check_corpus(conn: psycopg.Connection) -> None:
 class PostgresBackend:
     name = "postgres"
 
-    def search(self, vector, k: int) -> list[Result]:
+    def search(self, query: Query, k: int) -> list[Result]:
+        vector = query.vector
         with connect() as conn:
             check_corpus(conn)
             rows = conn.execute(SEARCH, (vector, settings.embedding_model, vector, k)).fetchall()
