@@ -59,6 +59,10 @@ MANIFEST_PATH = Path("data/raw/manifest.json")
 # on the last line. Now a crash costs one year, and a re-run resumes.
 CHECKPOINT_DIR = Path("data/raw/years")
 
+# A checkpoint within this fraction of its quota is accepted as complete. See the
+# use site for what an exact comparison cost.
+CHECKPOINT_TOLERANCE = 0.98
+
 # How many papers each month holds. A past month's count never changes, so this is
 # cached across runs — it halves the request count on a resume, which matters
 # because arXiv soft-blocks clients that query too much in one sitting.
@@ -102,11 +106,25 @@ def fetch(limit: int, out_path: Path = RAW_PATH, refresh: bool = False) -> pd.Da
     this_year = date.today().year
     years = list(range(FROM_YEAR, this_year + 1))
 
+    # A year's total is the sum of its months, and the months are already cached
+    # from the previous run — so ask arXiv only for the years that are not.
+    #
+    # This is not a speed optimisation. Twelve counting requests run *before* any
+    # checkpoint is read, so a rate-limited retry died in this loop having done no
+    # work at all: it never reached the one year it still needed. Deriving the
+    # totals from the cache means a resumed fetch spends its requests on the gap.
+    month_counts = _load_counts()
     print(f"counting arXiv papers per year for {AI_CATEGORIES}")
     counts = {}
     for year in years:
-        counts[year] = arxiv_api.count_for_year(AI_CATEGORIES, year)
-        print(f"    {year}: {counts[year]:,} available")
+        wanted_months = 12 if year < this_year else date.today().month
+        cached = [month_counts[k] for k in month_counts if k.startswith(f"{year}-")]
+        if len(cached) >= wanted_months:
+            counts[year] = sum(cached)
+            print(f"    {year}: {counts[year]:,} available (from cache)")
+        else:
+            counts[year] = arxiv_api.count_for_year(AI_CATEGORIES, year)
+            print(f"    {year}: {counts[year]:,} available")
 
     quota = allocate(counts, limit)
     print(f"\nallocation across {len(years)} years (floor {MIN_PER_YEAR}/year):")
@@ -115,7 +133,6 @@ def fetch(limit: int, out_path: Path = RAW_PATH, refresh: bool = False) -> pd.Da
     print("\nfetching (arXiv allows one request per 3s — this takes a few minutes)")
     CHECKPOINT_DIR.mkdir(parents=True, exist_ok=True)
     rng = random.Random(SEED)
-    month_counts = _load_counts()
     frames = []
     for year in years:
         if quota[year] <= 0:
@@ -126,7 +143,14 @@ def fetch(limit: int, out_path: Path = RAW_PATH, refresh: bool = False) -> pd.Da
         checkpoint = CHECKPOINT_DIR / f"{year}-{SAMPLING_SCHEME}.parquet"
         if checkpoint.exists() and not refresh:
             cached = pd.read_parquet(checkpoint)
-            if len(cached) >= quota[year]:
+            # Close enough, deliberately. An exact `>=` re-fetched ten complete
+            # years because each was a handful of papers short of a quota that had
+            # shifted by 0.2% — the year totals now come from summing cached month
+            # counts rather than one whole-year query, and the two disagree
+            # slightly. Re-downloading 86,000 papers to gain forty is how a resume
+            # turns back into a full run, which is what the checkpoints exist to
+            # prevent. The corpus is a sample; its size is a target, not a contract.
+            if len(cached) >= quota[year] * CHECKPOINT_TOLERANCE:
                 print(f"    {year}: {len(cached):,} papers (cached)")
                 frames.append(cached)
                 continue

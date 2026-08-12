@@ -7,31 +7,59 @@
 ![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)
 ![Streamlit](https://img.shields.io/badge/Streamlit-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white)
 ![Hugging Face](https://img.shields.io/badge/Hugging%20Face-FFD21E?style=for-the-badge&logo=huggingface&logoColor=white)
-![OpenAI](https://img.shields.io/badge/OpenAI-412991?style=for-the-badge&logo=openai&logoColor=white)
 ![Ollama](https://img.shields.io/badge/Ollama-000000?style=for-the-badge&logo=ollama&logoColor=white)
 ![Pydantic](https://img.shields.io/badge/Pydantic-E92063?style=for-the-badge&logo=pydantic&logoColor=white)
 ![uv](https://img.shields.io/badge/uv-DE5FE9?style=for-the-badge&logo=uv&logoColor=white)
 
 **Ask a question about AI research, get an answer grounded in real papers — with the sources it came from.**
 
-A retrieval-augmented generation service over a corpus of ArXiv CS/AI abstracts. Semantic search finds the relevant passages, an LLM answers from those passages only, and every answer carries its citations. When the corpus does not support an answer, it says so instead of guessing.
+Retrieval-augmented generation over a corpus of arXiv CS/AI abstracts. Semantic search finds the
+relevant papers, a language model answers from those papers only, and every claim carries its
+citation. When the corpus cannot answer, it says so instead of guessing.
 
-Runs entirely on your machine with `docker compose up` — using either a local model via Ollama (no API key, no cost) or your own provider key.
+Runs entirely on your machine with `docker compose up`, on a local model via Ollama — no API key, no
+cost. There is no hosted instance: this is a project you run, not one you visit.
 
-> **Status: in development — the dense baseline is complete; hybrid retrieval is the remaining
-> release gate.**
-> `docker compose up` gives a working browser app over the corpus: ask a question, get a
-> grounded cited answer or an honest refusal, and see the papers behind both.
-> **This is a local-first project.** It runs entirely on one machine and is meant to; there
-> is no hosted instance and no live URL, by choice rather than by omission.
-> No benchmark in this README is estimated or aspirational — numbers appear only after
-> they are measured.
+> **Status: 10 of 12 steps.** The dense baseline is complete and measured. Hybrid retrieval
+> (Elasticsearch BM25 + RRF) is the remaining work before deployment.
+> No number in this README is estimated — measurements appear only after they are taken.
+
+---
+
+## Results
+
+Measured against 108 questions — 100 answerable from the corpus with the expected paper recorded,
+6 the corpus provably cannot answer, 2 targeting known weak spots. Full detail in
+[docs/metrics.md](docs/metrics.md).
+
+| Metric | Value |
+|---|---|
+| Corpus | 90,088 arXiv papers, 2015-2026 |
+| **Retrieval hit-rate@5** | **79%** |
+| hit-rate@1 · @10 | 62% · 85% |
+| MRR@5 | 0.688 |
+| Query latency | 52 ms median · 95 ms p95 |
+| Refusal on out-of-corpus questions | **100%** |
+| Cost per query | $0 — everything runs locally |
+
+**Refusal is measured, not asserted.** For a question the corpus can answer, the nearest paper sits at
+cosine distance 0.091-0.265; for one it cannot, 0.402-0.503. No overlap, at 3× the corpus size.
+
+**The gap between hit-rate@5 (79%) and MRR (0.688) is the case for reranking** — the right paper is
+usually retrieved, and usually not first. Hybrid retrieval is the next step and this is the baseline
+it has to beat.
+
+> **Generation numbers are not on this table yet.** End-to-end citation accuracy, the small-versus-large
+> model comparison and the invented-citation count were all measured against the previous 30,061-paper
+> corpus and its 34 questions. Both changed; the numbers have not been re-taken, so they are in
+> [docs/generation.md](docs/generation.md) labelled with the corpus they belong to rather than
+> reprinted here as though they still held.
 
 ---
 
 ## Quickstart
 
-Requires Docker and [uv](https://docs.astral.sh/uv/).
+Requires [Docker](https://docs.docker.com/get-started/) and [uv](https://docs.astral.sh/uv/).
 
 ```bash
 git clone https://github.com/bunyamin-polat/papermind.git
@@ -39,46 +67,36 @@ cd papermind
 cp .env.example .env
 
 uv sync
-docker compose up -d
-uv run python -m scripts.check_db
+docker compose up -d                              # Postgres, API on :8000, UI on :8501
+uv run python -m scripts.check_db                 # should print "step 0 OK"
 ```
 
-Expected output:
-
-```text
-connecting to localhost:5434/papermind
-  postgres : PostgreSQL 17.10 (Debian 17.10-1.pgdg12+1) on aarch64-unknown-linux-gnu
-  pgvector : 0.8.6
-  cosine distance between [1,0] and [0,1] : 1.0
-
-step 0 OK
-```
-
-If port 5434 is taken on your machine, change `POSTGRES_PORT` in `.env` — only the host side of the mapping moves.
-
-Then load the corpus:
+Then load the corpus — it is fetched, not committed:
 
 ```bash
-uv run python -m ingestion.fetch --limit 30000   # query arXiv, sample → data/raw/
-uv run python -m ingestion.clean                 # normalise, deduplicate, load into papers
-uv run python -m ingestion.embed                 # embed every abstract into pgvector
+uv run python -m ingestion.fetch --limit 2000     # ~3 min, enough to try it
+uv run python -m ingestion.clean
+uv run python -m ingestion.embed
 ```
 
-The fetch queries the arXiv API, which permits one request every three seconds, so a 30,000-paper corpus takes roughly twenty minutes. Each year is checkpointed to `data/raw/years/` as it completes, so an interrupted run resumes instead of restarting. Pass `--refresh` to ignore the checkpoints and pull newer papers.
+Drop `--limit` for the full corpus: about 20 minutes of arXiv fetching (their API allows one request
+every three seconds) plus 8 minutes of embedding. All three commands are idempotent — an interrupted
+run resumes rather than restarting.
 
-All three are safe to re-run. `id` is the primary key and the load upserts, so a second `clean` leaves the row count unchanged; `embed` skips papers that already have a vector for the configured model, so an interrupted run resumes where it stopped.
-
-To reset the database completely (drops the volume and re-runs `db/init/`):
+For generated answers, Ollama runs **on the host**, deliberately — Docker on macOS cannot reach Metal,
+so a containerised Ollama silently falls back to CPU and answers take minutes instead of seconds:
 
 ```bash
-docker compose down -v && docker compose up -d
+ollama serve & ollama pull qwen3:4b-instruct
 ```
+
+Open <http://localhost:8501>, or see [docs/api.md](docs/api.md) for the HTTP interface.
 
 ## How it works
 
 Two things happen at completely different times, and keeping them separate is the core of the design.
-
-**Ingestion** runs once, in bulk: papers are fetched, cleaned, embedded, and written to Postgres — one vector per paper. **Query** runs per request: the question is embedded, the nearest papers are retrieved by cosine similarity, and an LLM is asked to answer from those abstracts and nothing else.
+**Ingestion** runs once, in bulk. **Query** runs per request. A user never uploads anything — the
+corpus is fixed, loaded once, and shared by every query.
 
 ```mermaid
 flowchart LR
@@ -95,63 +113,39 @@ flowchart LR
     end
 ```
 
-A user never uploads anything. The corpus is fixed, loaded once, and shared by every query.
+## Why it is built this way
 
-## Configuration
+Every row is a decision, the alternative that was rejected, and the evidence that decided it.
 
-All configuration is environment variables, read in exactly one place ([`core/config.py`](core/config.py)). Copy `.env.example` to `.env` and edit.
+| Choice | Instead of | What decided it |
+|---|---|---|
+| `BAAI/bge-base-en-v1.5` | `all-MiniLM-L6-v2` | MiniLM's window is 256 tokens and **26% of these abstracts exceed it** — silently truncated, no error |
+| **No chunking** | Chunking everything | Same measurement: 3,999 of 4,000 abstracts fit a 512-token window whole |
+| PostgreSQL + pgvector | A dedicated vector DB | One datastore. Filtering is `WHERE`, ingest is incremental ([docs/vector-index.md](docs/vector-index.md)) |
+| Explicit `hnsw.ef_search` | pgvector's default of 40 | **At exactly 40 the planner abandons the index** — same results, 19× slower, no warning |
+| No LangChain | `RetrievalQA` | The chain is four function calls. A framework would add a dependency and hide the part worth understanding |
+| Citations by **position** | Asking the model for the arXiv id | A model shown no identifier cannot invent one. 0 fabrications in 68 answers ([docs/generation.md](docs/generation.md)) |
+| Refusal as one exact sentence | "Say you don't know" | An exact string is testable; an instruction to be honest is not |
+| Elasticsearch BM25 + RRF *(next)* | Dense retrieval alone | Two measured failures: the identifier `2406.06538` is in the corpus and **not in the top 20**, and "papers that do NOT use transformers" returns *Simplifying Transformer Blocks* ([docs/retrieval.md](docs/retrieval.md)) |
 
-### Choosing a model
+## How this is verified
 
-Two supported paths, behind one provider abstraction — switching is a config change, not a code change.
+Fourteen defects have been found in this project so far. **Every one exited zero and printed plausible
+output.** None raised an exception, logged a warning, or failed a test — a suite asserting on results
+would have passed for all fourteen, because in every case the results looked correct.
 
-| Path | Cost | Setup | Use when |
-|---|---|---|---|
-| **Local (Ollama)** | Free | Install Ollama, pull a model | Default. Development, and anyone who wants to run this without paying for anything |
-| **Your own API key** | Yours | Put the key in `.env` | You want frontier-model answer quality |
+What caught them was looking at something other than the result:
 
-*The generation path is not implemented yet — it arrives at step 5. The rows above describe the intended design, not shipped behaviour.*
+| What was wrong | What it looked like | What caught it |
+|---|---|---|
+| Sampling collapsed each month onto its final day | Right row count, all 12 months present | A day-of-month histogram — 98.3% in days 22-31 |
+| The embedding model truncated 26% of abstracts | Vectors written, search returned sensible papers | Tokenising the corpus against the model's window |
+| The planner silently stopped using the HNSW index | Identical papers, identical order, 19× slower | `EXPLAIN` |
 
-**Embeddings are always local** and already working: `BAAI/bge-base-en-v1.5`, 768 dimensions, run through `sentence-transformers`. The retrieval half of the system therefore costs nothing regardless of which generation path you configure.
-
-The model was chosen by measurement, not default. `all-MiniLM-L6-v2` — the obvious small choice — has a 256-token window, and 26% of these abstracts exceed it (median 206 tokens, p99 394, max 541). Those would have been silently truncated, losing ~15% of their text with no error raised. A 512-token window fits 3,999 of 4,000 abstracts whole.
-
-**There is no chunking**, and that is a consequence of the same measurement: an abstract that fits the window whole should not be cut into pieces that each lose the other's context. Chunking becomes necessary when documents outgrow the window, which is a different corpus than this one.
-
-## Corpus
-
-arXiv abstracts in eight AI categories — `cs.AI`, `cs.CL`, `cs.CV`, `cs.IR`, `cs.LG`, `cs.MA`, `cs.NE`, `stat.ML` — sampled from 2015 onward, queried live from the [arXiv API](https://info.arxiv.org/help/api/user-manual.html).
-
-**Why the API and not a dataset dump.** The obvious choice, HuggingFace's `gfissore/arxiv-abstracts-2021`, is a snapshot that ends in December 2021. A corpus frozen there cannot answer anything about work published since — most of what anyone would ask an AI-research assistant. Querying arXiv directly means the corpus reaches the present day and can be refreshed by re-running the fetch.
-
-**Why these eight categories and not more.** They are arXiv's core AI set plus `cs.MA`. Broader categories such as `cs.RO` and `cs.CR` already reach the corpus through cross-listing — an ML-heavy robotics paper carries `cs.LG` as well — so adding them explicitly would only pull in the papers carrying *no* AI tag, which are by definition the least relevant. `cs.MA` is the exception: multi-agent work is under-represented by cross-listing and directly on topic.
-
-**Sampling took three attempts.**
-
-The arXiv API sorts only by submission date and truncates, so asking for "the newest N" of any window returns that window's tail:
-
-| Scheme | What it actually produced |
-|---|---|
-| Newest N per year | Each year collapsed onto its final three weeks — "2018" meant 10-31 December |
-| Newest N per month | Each month collapsed onto its final day; 98% of papers fell on days 22-31 |
-| **Randomly-offset slice per month** | Current scheme — contiguous, but no longer always at the same end |
-
-Narrowing the window was not the fix, because truncation simply moved down a level. The fix is to place the slice at a random offset inside each month, chosen from a fixed seed so the corpus stays reproducible.
-
-| Year | 2015 | 2016 | 2017 | 2018 | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
-|---|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|
-| Papers | 563 | 732 | 960 | 1,332 | 1,799 | 2,328 | 2,531 | 2,772 | 3,408 | 4,332 | 5,280 | 4,024 |
-
-Papers carry an average of two categories, so the per-category counts overlap: `cs.LG` 13,945 ·
-`cs.CV` 9,875 · `cs.AI` 9,176 · `cs.CL` 5,826 · `stat.ML` 3,902 · `cs.IR` 1,264 · `cs.NE` 804 ·
-`cs.MA` 618. 2026 covers January to August, the year being incomplete.
-
-**Known limit:** the sample is a small fraction of what arXiv holds — 30,061 of roughly 590,000 AI
-papers published since 2015. Any *specific* paper is therefore unlikely to be present. That is what
-makes refusal a first-class outcome rather than an edge case, and why it gets its own build step and
-its own test.
-
-The corpus is **not committed to this repository**; it is fetched at setup time. ArXiv content remains under its authors' terms — see [arxiv.org/help/license](https://arxiv.org/help/license).
+So the tests assert on **mechanism and shape, not success** — that the query plan uses the index, that
+no quarter of the month holds more than 45% of the corpus, that the UI never imports the backend.
+Three of the fourteen were in *measurement* code: the instrument is as likely to be wrong as the thing
+it measures. All fourteen, and the tests they produced, are in [docs/verification.md](docs/verification.md).
 
 ## Project structure
 
@@ -164,395 +158,49 @@ papermind/
 ├── storage/       # Postgres + pgvector schema and access
 ├── app/           # FastAPI: POST /ask
 ├── ui/            # Streamlit front end
-├── scripts/       # operational checks
-└── db/init/       # SQL that runs on first database creation
+└── docs/          # the long-form reasoning behind each decision
 ```
 
-`ingestion/` and `retrieval/` are separate packages because they run at different times and rates. Keeping them apart is what stops the bulk-load path and the per-request path from bleeding into each other.
+`ingestion/` and `retrieval/` are separate packages because they run at different times and rates —
+that is what stops the bulk-load path and the per-request path from bleeding into each other.
 
-## Project status
-
-Ten build steps done, plus the hybrid retrieval gate that remains. Each one ends with something that
-runs.
-
-✅ done · 🟡 in progress · ⬜ not started
+## Status
 
 | # | Step | State |
 |---|---|:-:|
-| 0 | Setup — Docker, Postgres + pgvector, config, health check | ✅ |
-| 1 | Ingest the corpus into a `papers` table | ✅ |
-| 2 | Embed into pgvector | ✅ |
-| 3 | Retrieval — question → top-k papers by cosine similarity | ✅ |
+| 0-3 | Setup · corpus ingest · embeddings · retrieval | ✅ |
 | 4 | Evaluation harness — hand-written questions, hit-rate@k | ✅ |
-| 5 | RAG generation — grounded answer with citations | ✅ |
-| 6 | Refusal — tested "I don't know" path | ✅ |
-| 7 | FastAPI `/ask` endpoint | ✅ |
-| 8 | Streamlit UI | ✅ |
-| 9 | Dockerise the application | ✅ |
-| 10 | **Hybrid retrieval — Elasticsearch BM25 + RRF; compare dense / lexical / fused** | ⬜ |
-| 11 | Measure and publish | ⬜ |
-
-**Works today:** PostgreSQL 17.10 with pgvector 0.8.6 comes up via Docker Compose. The ingestion
-pipeline queries the arXiv API, samples across 2015-2026, cleans and deduplicates, and loads
-**30,061 papers**; embedding stores one 768-dimension vector per paper behind an HNSW index. All
-three commands are idempotent. Semantic search returns sensible neighbours in **3.7 ms** at full
-recall, and out-of-domain questions land measurably further away — cosine distance 0.18 for
-"attention mechanism in transformers" against 0.45 for "how do you bake sourdough bread".
-
-**Release contract:** this is a single PaperMind release, not a v1 followed by a v2. The current
-dense-only implementation is its measured baseline. Docker Compose must also run Elasticsearch; BM25,
-dense and RRF-fused retrieval must be measured over the same golden questions; and the selected
-backend must work end to end before the retrieval work is called done.
-
-**Two retrieval backends, and why.** Queries are served either from PostgreSQL or from a frozen
-in-memory artifact, chosen by `RETRIEVAL_BACKEND`. At this corpus size an exact in-memory search over
-30,061 x 768 measured **2.9 ms** against **3.7 ms** for pgvector with an HNSW index — the database is
-not the faster reader. What Postgres genuinely buys is everything *around* a query: SQL, incremental
-re-indexing, adding papers without rebuilding anything. So Postgres is the backend while the corpus is
-being built, and the artifact is for serving a corpus that has stopped changing.
-
-The risk of two implementations is that they drift apart while both keep returning plausible papers,
-so `tests/test_backend_parity.py` runs the evaluation questions through both and asserts identical
-results.
-
-## Retrieval
-
-`retrieval/search(question, k)` embeds the question with the same model as the corpus and returns the
-k nearest papers, closest first. A hit is a whole paper — nothing was chunked, so nothing has to be
-stitched back together, and every result already is the unit a reader would open.
-
-```console
-$ uv run python -m scripts.ask "what is an attention mechanism in neural networks"
-
-1. [0.160] Understanding Attention: In Minds and Machines
-   https://arxiv.org/abs/2012.02659
-2. [0.175] Understanding More about Human and Machine Attention in Deep Neural Networks
-   https://arxiv.org/abs/1906.08764
-3. [0.203] Thank you for Attention: A survey on Attention-based Artificial Neural Networks...
-   https://arxiv.org/abs/2102.07259
-4. [0.208] Are Sixteen Heads Really Better than One?
-   https://arxiv.org/abs/1905.10650
-```
-
-### Where semantic search loses to keyword search
-
-Two failures, both reproduced against this corpus rather than quoted from a blog post:
-
-**Exact identifiers.** Asked for `2406.06538` — a paper that *is* in the corpus — semantic search does
-not return it in the top 20. It answers with unrelated optimisation papers at distance 0.52, because
-an identifier carries no meaning to embed. A keyword index finds it in one lookup.
-
-**Negation.** Asked for "papers that do NOT use transformers", the second result is *Simplifying
-Transformer Blocks*. Embeddings have no representation for negation: "not X" lands next to "X".
-
-Both are the standard argument for hybrid retrieval. Neither is hypothetical here — they are what
-this corpus actually does — so hybrid retrieval is a required part of the single release rather than
-a later version.
-
-**The release answers them with Elasticsearch beside pgvector, not instead of it.** Dense retrieval
-stays in Postgres; a lexical BM25 index goes into Elasticsearch; the two ranked lists fuse with
-Reciprocal Rank Fusion. Fusion happens on **ranks, not scores** — a cosine distance and a BM25 score
-are different units and averaging them is meaningless.
-
-The alternative was Postgres' own full-text search, which would have kept everything in one
-datastore. It was not chosen: a real lexical engine is what production systems put in front of this
-problem, `2406.06538` is exactly the query BM25 exists for, and running the two engines side by side
-is what makes the comparison publishable — dense alone, lexical alone, and fused, over the same
-questions. A hybrid result without the two arms measured separately is an assertion. This work is
-done and accepted locally before the cloud image is rebuilt and deployed.
-
-### Two safeguards
-
-**The corpus and the query must share an embedding model.** Using different ones returns neighbours
-that mean nothing, with no error anywhere, so the retriever checks which model produced the stored
-vectors and raises `ModelMismatch` if it disagrees with the configuration.
-
-**`hnsw.ef_search` is set per connection, never left to the default** — see below for why that matters
-more than it should.
-
-## Running it
-
-```bash
-ollama serve &                       # generation, on the host — see below
-ollama pull qwen3:4b-instruct
-docker compose up -d                 # Postgres, API on :8000, UI on :8501
-```
-
-Then load the corpus once. It is **not** baked into the image — 287 MB of data belongs in a volume,
-not in a layer that goes stale:
-
-```bash
-uv run python -m ingestion.fetch --limit 2000   # ~3 min, enough to try it
-uv run python -m ingestion.clean
-uv run python -m ingestion.embed
-```
-
-Drop `--limit` for the full 30,061-paper corpus: about 20 minutes of arXiv fetching (their API allows
-one request every three seconds) plus 8 minutes of embedding.
-
-**Ollama stays on the host, deliberately.** Docker on macOS cannot reach Metal, so a containerised
-Ollama silently falls back to CPU and answers take minutes instead of seconds — the demo appears hung
-rather than slow. The API reaches back out via `host.docker.internal`, with `extra_hosts` making that
-name resolve on Linux too.
-
-### Image size: 19.4 GB → 3.08 GB
-
-The first build was 19.4 GB. Two causes, both invisible until the number was looked at:
-
-| Cause | Cost |
-|---|--:|
-| PyPI's default `torch` on Linux bundles CUDA — 2.9 GB of `nvidia` packages, 652 MB of triton | ~4.5 GB |
-| A single `RUN chown -R`, which rewrites every file's metadata and duplicates the tree into a new layer | 6.16 GB |
-
-The container has no GPU and never will: embedding is CPU-only and generation happens in Ollama on
-the host. `pyproject.toml` therefore resolves `torch` from PyTorch's CPU index on Linux while macOS
-keeps the default MPS wheel. Ownership is now set by `COPY --chown` as files are written, so nothing
-is rewritten afterwards.
-
-The UI reaches the API over HTTP and never imports from it — `tests/test_ui.py` asserts that by
-parsing the imports. It is an easy boundary to erase by accident, and erasing it would make the API
-decorative: untested by anything a user touches, and at step 9 a container with two entrypoints
-pretending to be one.
-
-**What the UI shows that most AI demos do not.** Every answer carries the papers consulted, how close
-each one was, which models produced it, and how long it took. A refusal is rendered as information
-rather than as an error, with the five consulted papers still listed — because "consulted five, none
-answered" is a different statement from "something broke", and only one of them is true. All of it is
-free to display, because the API already returns it.
-
-## API
-
-```bash
-uv run uvicorn app.main:app --reload    # http://localhost:8000/docs
-```
-
-```console
-$ curl -s localhost:8000/health
-{"status":"ok","papers":30061,"embeddings":30061,
- "embedding_model":"BAAI/bge-base-en-v1.5","generation_model":"qwen3:4b-instruct",
- "llm_reachable":true}
-```
-
-```console
-$ curl -s -X POST localhost:8000/ask -H 'Content-Type: application/json' \
-    -d '{"question":"how can learned noise protect private data sent to a cloud service?"}'
-{
-  "answer": "Learned noise can protect private data by adding distributions that reduce the
-             information content of the communicated data [1]. ...",
-  "refused": false,
-  "sources":   [{"marker":1,"paper_id":"1905.11814","title":"Shredder: Learning Noise ...",
-                 "url":"https://arxiv.org/abs/1905.11814","distance":0.1856}],
-  "retrieved": [ ...5 papers with distances... ],
-  "models":    {"embedding":"BAAI/bge-base-en-v1.5","generation":"qwen3:4b-instruct"},
-  "latency_ms": 3782.3
-}
-```
-
-**`retrieved` is returned next to `sources`.** `sources` is what the answer cited; `retrieved` is
-everything that went into the prompt. A refusal therefore returns five papers and zero sources —
-"consulted five, none answered" is a different statement from "found nothing", and only one of them
-is true. It is also the difference between diagnosing bad retrieval and bad grounding.
-
-**The response names the models that produced it.** Which embedder and which generator answered is
-part of what the answer means; two responses are not comparable without it.
-
-**Failure modes are distinguished.** Ollama unreachable is `503` — a dependency is down, retrying may
-work. A corpus embedded with a different model is `500` — this service is misconfigured and retrying
-never helps. Both carry a message that names what to fix.
-
-**The embedding model loads at startup, not on first request.** It costs about eight seconds; left
-lazy, the first caller sees eleven seconds where everyone else sees three, which reads as an
-intermittent fault rather than a warm-up.
-
-## Generation
-
-```console
-$ uv run python -m retrieval.answer "how can learned noise protect private data sent to a cloud inference service"
-
-Learned noise can protect private data sent to a cloud inference service by adding noise
-distributions that reduce the information content of the communicated data [1]. Shredder, an
-end-to-end framework, learns these distributions through an offline process that balances
-inference accuracy against information degradation [1]. Experiments show a 74.70% reduction in
-mutual information between the input and the communicated data [1].
-
-Sources:
-  [1] Shredder: Learning Noise Distributions to Protect Inference Privacy
-      https://arxiv.org/abs/1905.11814
-```
-
-### The model is never shown an identifier
-
-It cites sources by their **position** in the list it was given — `[1]`, `[2]` — and code maps
-those positions back to papers. Ask a model to write `arXiv:2406.06538` and sooner or later it
-writes a plausible identifier for a paper that does not exist, with nothing in the text to reveal
-it. A position cannot be inflated into something real: `[9]` in a list of five is detectably wrong,
-so it is dropped and counted rather than shown.
-
-Across 68 generated answers, **zero invented citations**.
-
-### Refusal is one exact sentence
-
-`The provided sources do not answer this question.` — not "say you don't know". An exact string is
-testable; an instruction to be honest is not.
-
-### What it costs, per local model
-
-Same prompt, same corpus, 24 answerable and 6 unanswerable questions:
-
-| | `qwen3:4b-instruct` | `gpt-oss:20b` |
-|---|--:|--:|
-| Cites the expected paper | 83% | **92%** |
-| False refusals (answerable, refused) | 3 / 24 | 1 / 24 |
-| Out-of-corpus refused | **100%** | **100%** |
-| Invented citations | 0 | 0 |
-| Latency (median / max) | **3.2s / 12.3s** | 5.5s / 37.3s |
-| Download | **2.5 GB** | 13.8 GB |
-
-The larger model closes the gap to the retrieval ceiling — 92% end to end against 92% hit-rate,
-meaning generation loses nothing — **and it does so without spending any refusal discipline.** Both
-refuse every out-of-corpus question.
-
-The 4B is the default anyway, because 2.5 GB is the difference between "clone and run" and "clone,
-then find 14 GB and enough VRAM". Set `OLLAMA_MODEL=gpt-oss:20b` to trade 2.3 seconds for nine
-points of coverage.
-
-### The number most RAG projects do not publish
-
-Retrieval hit-rate@5 is 92%. End-to-end citation accuracy with the small model is 83%. **The
-nine-point gap is generation discarding papers retrieval had already found.** Two of the three false
-refusals had the correct paper at rank 1, with the answer stated verbatim in the abstract — the
-model simply declined. Reporting only the retrieval number would have hidden that entirely.
-
-## Vector index
-
-Which index, measured rather than assumed — 30,061 vectors, top-5, timings taken server-side from
-`EXPLAIN ANALYZE`, recall measured against exact search ([`scripts/bench_index.py`](scripts/bench_index.py)):
-
-| Configuration | Median | p95 | recall@5 | Index used |
-|---|--:|--:|--:|:-:|
-| No index (exact) | 70.5 ms | 81.1 ms | 100% | — |
-| HNSW `ef_search=40` | 69.7 ms | 72.2 ms | 100% | **0/12** |
-| **HNSW `ef_search=64`** | **3.7 ms** | 4.9 ms | 100% | 12/12 |
-| HNSW `ef_search=100` | 4.6 ms | 7.3 ms | 100% | 12/12 |
-| IVFFlat `probes=10` | 1.2 ms | 1.4 ms | 93.3% | 12/12 |
-| IVFFlat `probes=20` | 2.2 ms | 2.4 ms | 98.3% | 12/12 |
-| IVFFlat `probes=40` | 4.2 ms | 4.8 ms | 100% | 12/12 |
-
-**HNSW.** At full recall it is marginally faster than IVFFlat (3.7 ms against 4.2 ms), but the margin
-alone would not decide it. IVFFlat clusters around whatever data exists when the index is built and
-degrades as rows are added; this corpus is meant to be refreshed, so an index that tolerates
-incremental inserts is worth 5× the build time (16.9 s against 3.3 s).
-
-**One trap worth knowing.** At `hnsw.ef_search = 40` the planner abandons the index in every query
-and falls back to a sequential scan — 19× slower, identical results, no error and no warning. **40 is
-pgvector's own default**, so leaving the setting untouched picks the one value that fails.
-
-The cause is a discontinuity in pgvector 0.8.6's cost estimate. Below 40 the estimated startup cost
-climbs steeply — 348 at `ef=5`, 494 at 10, 754 at 20, 992 at 30 — and by 40 it has passed the
-sequential-scan estimate of 1217, so the planner rejects the index. At `ef=50` it resets to 347 and
-from there rises almost flat, reaching only 370 by `ef=400`. Two branches of the formula, meeting
-badly, exactly at the default:
-
-| `ef_search` | 5 | 10 | 20 | 30 | **40** | 50 | 64 | 100 | 200 |
-|---|--:|--:|--:|--:|--:|--:|--:|--:|--:|
-| Median | 1.0 ms | 1.2 ms | 1.9 ms | 2.3 ms | **71.5 ms** | 3.4 ms | 3.7 ms | 4.7 ms | 7.3 ms |
-| Plan | index | index | index | index | **seq scan** | index | index | index | index |
-
-Recall@5 measured 100% at every value **on the 12 benchmark queries**, so the configured 100 buys
-margin rather than accuracy. It is pinned in `core/config.py` rather than left to the default.
-
-**That 100% was a property of the query set, not of the index.** Re-measured later against all 34
-evaluation questions, HNSW agrees with exact search on 30 of 34 rankings and 33 of 34 top results —
-96.5% overlap at k=5. HNSW is an approximate index and this is what approximate costs. It went
-unnoticed because twelve queries were not enough to show it, which is the same mistake as reporting
-a hit-rate from a small eval set and believing the third decimal place.
-
-## How this is verified
-
-Fourteen defects have been found in this project so far. **Every one of them exited zero and printed
-plausible output.** None raised an exception, logged a warning, or failed a test. A suite asserting
-on results would have passed for all fourteen, because in every case the results were correct — the
-corpus loaded, the search returned papers, the container answered.
-
-What caught them was looking at something other than the result.
-
-| What was wrong | What it looked like | What caught it |
-|---|---|---|
-| Sampling collapsed each month onto its final day | Right row count, all 12 months present | Day-of-month histogram — 98.3% fell in days 22-31 |
-| The embedding model truncated 26% of abstracts | Vectors written, search returned sensible papers | Tokenising the corpus and comparing to the model's window |
-| The query planner silently stopped using the HNSW index | Identical papers, identical order, 19× slower | `EXPLAIN` |
-| The image shipped 4.5 GB of CUDA it cannot use, plus a 6.16 GB layer from one `chown -R` | Container built, started and answered correctly | Reading the image size, then `docker history` and `du` |
-| Compose passed the host's `OLLAMA_HOST` into the container, where `localhost` is the container | All services up, ports mapped, `curl` returned 200 | `/health` reporting `degraded` — the check itself |
-| A dependency override was ignored because the package was transitive | `uv lock` reported "Resolved 113 packages", twice | Grepping the lock for the index that should have been in it |
-| Settings required database credentials at import, so the memory backend could not start without a database it never uses | Process exited before any application code ran; the error named Pydantic, not the cause | Starting the app with the database settings unset |
-
-Three of the fourteen were in measurement code rather than product code. The instrument is as likely
-to be wrong as the thing it measures: the index benchmark first reported `ef_search=40` as *slower*
-than `ef_search=100` on the same index, which is impossible, and that contradiction is what exposed a
-missing warm-up and a client-side timer.
-
-### What this changes about the tests
-
-Assertions are on mechanism and shape, not on success:
-
-- [`test_query_plan_actually_uses_the_index`](tests/test_retriever.py) runs `EXPLAIN` and asserts the
-  index appears. A sequential scan returns the same papers in the same order — output cannot reveal it.
-- [`test_papers_are_spread_across_the_month`](tests/test_regressions.py) fails if any quarter of the
-  month holds more than 45% of the corpus. Under the broken scheme it was 98.3%.
-- [`test_lock_contains_no_cuda_packages`](tests/test_regressions.py) fails if CUDA returns to the
-  dependency lock, which is the only visible sign that the CPU-wheel override stopped applying.
-- [`test_compose_does_not_interpolate_the_host_ollama_url`](tests/test_regressions.py) fails if the
-  container is handed a URL that resolves to itself.
-- [`test_ui_never_imports_the_backend`](tests/test_ui.py) parses every file in `ui/` and fails on a
-  direct import. The import would work — same repo, same interpreter — which is exactly why a comment
-  saying "don't" was not enough.
-- [`test_search_is_never_called_for_an_invalid_request`](tests/test_api.py) asserts something does
-  *not* happen: that validation runs before the expensive work.
-- [`test_settings_load_with_no_database_configuration`](tests/test_regressions.py) exercises the
-  deployed image's import path, while
-  [`test_postgres_backend_refuses_to_run_unconfigured`](tests/test_regressions.py) keeps the local
-  backend strict when it is explicitly selected.
-
-`GET /health` checks the database, the corpus, and whether the language model answers, rather than
-returning `{"status":"ok"}` — which is how the container misconfiguration above was found rather than
-shipped.
-
-## Metrics
-
-Measured by [`evaluation/run.py`](evaluation/run.py) against 34 hand-written questions: 24 answerable
-from the corpus, 6 the corpus provably cannot answer, and 4 that target known weak spots. Questions
-were written by reading a random sample of papers, and the retrieval results were not consulted while
-writing them.
-
-| k | hit-rate | MRR |
-|--:|--:|--:|
-| 1 | 88% | 0.875 |
-| 3 | 92% | 0.889 |
-| **5** | **92%** | **0.889** |
-| 10 | 100% | 0.903 |
-
-| Metric | Value |
-|---|---|
-| Corpus size | 30,061 papers |
-| Retrieval hit-rate@5 | 92% (24 questions) |
-| Query latency | 39 ms median, 42 ms p95 |
-| Cost per query | $0 — retrieval is entirely local |
-| Refusal rate on out-of-corpus questions | 100% (6 questions) |
-| End-to-end citation accuracy | 83% small model · 92% large |
-| Answer latency | 3.2 s median (local, free) |
-| Invented citations | 0 / 68 answers |
-
-**The two misses are not the same kind of miss**, which is only visible because the harness prints
-per-question results:
-
-- *"how are graph convolutional networks used to forecast traffic across a road network?"* returned
-  five papers that are all genuinely about graph convolutions for traffic forecasting; the expected
-  paper was sixth. This is a limitation of single-gold-label evaluation, not of retrieval.
-- *"which application areas do recommender system researchers neglect?"* returned five recommender-
-  systems papers, none of which address neglected domains. Here retrieval matched the topic and
-  missed the actual question.
-
-**Out-of-corpus questions separate cleanly.** The closest paper for an in-corpus question sits at
-cosine distance 0.112-0.290; for a question the corpus cannot answer, 0.411-0.506. The gap of 0.121
-with no overlap is what makes a distance-based refusal threshold viable at step 6 — measured rather
-than assumed.
+| 5-6 | Grounded generation with citations · tested refusal | ✅ |
+| 7-8 | FastAPI `/ask` · Streamlit UI | ✅ |
+| 9 | Dockerise — one image, three services | ✅ |
+| 10 | **Hybrid retrieval — Elasticsearch BM25 + RRF** | ⬜ |
+| 11 | Deploy, after local acceptance | ⬜ |
+
+## Known limits
+
+- **The corpus is a sample** — 90,088 of roughly 590,000 AI papers published since 2015, and **2026
+  is under-sampled** (4,024 against a quota of 13,781; arXiv rate-limited the fetch). Any *specific*
+  paper is unlikely to be present, which is why refusal is a first-class outcome with its own build
+  step and its own test.
+- **The questions are machine-written.** They are drafted and graded by `gpt-oss:20b` — a different
+  model from the one that answers — and filtered for copying the source and for being answerable
+  without retrieval. They have not been read by a human end to end. Every quality number here rests
+  on them.
+- **The eval set is tied to the corpus sample, not just to the corpus.** Growing 30,061 → 90,088 did
+  not add papers to the old sample, it drew a different one: 23 of 26 expected papers vanished and
+  hit-rate read 12%. The questions are regenerated with `evaluation.build_questions` whenever the
+  corpus changes, and that is a required step rather than a courtesy.
+- **HNSW is approximate**, and its agreement with exact search has not been re-measured at 90,088
+  vectors. The 96.5% figure below belongs to the 30,061-vector index.
+
+## Documentation
+
+[Corpus and sampling](docs/corpus.md) · [Retrieval](docs/retrieval.md) ·
+[Vector index](docs/vector-index.md) · [Generation](docs/generation.md) ·
+[API](docs/api.md) · [Running it](docs/running.md) ·
+[Metrics](docs/metrics.md) · [Verification](docs/verification.md)
+
+---
+
+The corpus is not committed; it is fetched at setup. arXiv content remains under its authors' terms —
+see [arxiv.org/help/license](https://arxiv.org/help/license). Code is MIT, see [LICENSE](LICENSE).

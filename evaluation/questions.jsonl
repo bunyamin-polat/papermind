@@ -1,34 +1,108 @@
-{"slice": "in_corpus", "expected": "1604.08182", "question": "how can hyperspectral images be classified without labels using total variation methods?"}
-{"slice": "in_corpus", "expected": "1606.07035", "question": "how do you make constraint-based causal discovery more reliable when there is little data?"}
-{"slice": "in_corpus", "expected": "1607.00470", "question": "why did keyframe-based monocular SLAM replace filter-based approaches?"}
-{"slice": "in_corpus", "expected": "1903.08100", "question": "can a deep network localise the seizure onset zone from EEG in focal epilepsy?"}
-{"slice": "in_corpus", "expected": "1904.10761", "question": "how does data cleaning affect model fairness and robustness to attacks, not just accuracy?"}
-{"slice": "in_corpus", "expected": "1905.11814", "question": "how can learned noise protect private data sent to a cloud inference service?"}
-{"slice": "in_corpus", "expected": "1911.11916", "question": "how do you handle limited labelled images when classifying construction site equipment?"}
-{"slice": "in_corpus", "expected": "1911.12093", "question": "how are graph convolutional networks used to forecast traffic across a road network?"}
-{"slice": "in_corpus", "expected": "2004.14850", "question": "what role will machine learning play at the network edge in 6G?"}
-{"slice": "in_corpus", "expected": "2107.09144", "question": "how can physical wave constraints be built into matrix factorisation with optimality guarantees?"}
-{"slice": "in_corpus", "expected": "2202.09649", "question": "how can you find local semantic directions in a GAN latent space without segmentation masks?"}
-{"slice": "in_corpus", "expected": "2210.13938", "question": "is syntactic priming in Hindi driven by one mechanism or by several?"}
-{"slice": "in_corpus", "expected": "2212.00638", "question": "why do small differences in how you finetune CLIP produce large accuracy differences?"}
-{"slice": "in_corpus", "expected": "2303.15672", "question": "what numerical methods solve convex multistage stochastic optimization problems?"}
-{"slice": "in_corpus", "expected": "2309.04366", "question": "how do you correct badly exposed photographs using a transformer?"}
-{"slice": "in_corpus", "expected": "2310.02489", "question": "how can transformer speech models be shrunk to fit in the memory of always-on devices?"}
-{"slice": "in_corpus", "expected": "2312.00746", "question": "how do large language models behave as agents in detective role-playing games?"}
-{"slice": "in_corpus", "expected": "2402.01845", "question": "how do you run bandit experiments when the units interfere with each other?"}
-{"slice": "in_corpus", "expected": "2407.17823", "question": "can bilevel optimization be solved without Hessians when the lower level is nonconvex?"}
-{"slice": "in_corpus", "expected": "2411.16645", "question": "which application areas do recommender system researchers neglect?"}
-{"slice": "in_corpus", "expected": "2503.02429", "question": "can removing one player from a tournament reverse the ranking of the others?"}
-{"slice": "in_corpus", "expected": "2510.21360", "question": "is there a benchmark for Swedish factual knowledge rather than a translated US one?"}
-{"slice": "in_corpus", "expected": "2602.10350", "question": "do intermediate layers of a speech model give better phoneme predictions than the final layer?"}
-{"slice": "in_corpus", "expected": "2605.30748", "question": "how can zero-shot text-to-speech stream its output while generating tokens in parallel?"}
+{"slice": "in_corpus", "expected": "2108.12476", "question": "how can we keep stance classifiers accurate as language changes over time without new labeled data?"}
+{"slice": "in_corpus", "expected": "2507.03052", "question": "how can i use a more flexible sparsity pattern than 2:4 in large language models to keep accuracy while cutting memory, and handle outlier weights effectively?"}
+{"slice": "in_corpus", "expected": "2306.12006", "question": "how can we learn macroscopic stress-strain relationships from microscale data when the material properties have abrupt discontinuities at interfaces?"}
+{"slice": "in_corpus", "expected": "2002.05380", "question": "can a simple regularization technique combined with data augmentation improve robustness to adversarial attacks on cifar-10 and imagenet?"}
+{"slice": "in_corpus", "expected": "1909.11218", "question": "under what circumstances do attention weights provide reliable explanations for model decisions in natural language processing tasks?"}
+{"slice": "in_corpus", "expected": "1908.11317", "question": "how can storing representations of every training pair help achieve over 60% accuracy in implicit discourse relation classification without explicit connectives?"}
+{"slice": "in_corpus", "expected": "2208.05358", "question": "does a dataset exist that pairs images with textual descriptions to solve simple addition or subtraction word problems involving state changes due to actions?"}
+{"slice": "in_corpus", "expected": "2206.04967", "question": "can a deep learning approach to acquire channel state information at the receiver increase spectrum efficiency by about 25% in 5g nr with only moderate feedback overhead?"}
+{"slice": "in_corpus", "expected": "1503.01967", "question": "how can entropy defined in physics be adapted to measure password complexity and genetic algorithm diversity?"}
+{"slice": "in_corpus", "expected": "1608.02076", "question": "can a dependency parsing model be improved by having it learn to agree on headword choices from left-to-right and right-to-left passes while keeping computational cost low?"}
+{"slice": "in_corpus", "expected": "2001.07263", "question": "how can we achieve state-of-the-art speech recognition on the switchboard dataset using only a few hundred hours of training data without relying on a pronunciation dictionary?"}
+{"slice": "in_corpus", "expected": "2012.09284", "question": "how can i generate extra sar images for automatic target recognition when training data is scarce?"}
+{"slice": "in_corpus", "expected": "2306.09612", "question": "how can we generate harder samples for minority classes to improve node classification on graphs with class imbalance?"}
+{"slice": "in_corpus", "expected": "1901.01834", "question": "how can we determine if a multi-attribute evaluation method in social computing is objective?"}
+{"slice": "in_corpus", "expected": "2005.08114", "question": "how can we learn a latent representation for model-based reinforcement learning that captures only the task-relevant future information while ignoring irrelevant scene details in cluttered environments?"}
+{"slice": "in_corpus", "expected": "2409.05339", "question": "how can we improve node classification performance on minority classes in graphs with highly skewed label distributions?"}
+{"slice": "in_corpus", "expected": "1710.08721", "question": "how can neural networks detect clickbait headlines without any language preprocessing and still work across different languages?"}
+{"slice": "in_corpus", "expected": "2109.10847", "question": "what benchmark exists for evaluating small pretrained language models trained on a single gpu across standard nlp tasks?"}
+{"slice": "in_corpus", "expected": "2201.09486", "question": "where does bias arise across data collection, modeling, and implementation in voice-based identity verification for female and non-us users?"}
+{"slice": "in_corpus", "expected": "1502.05435", "question": "how to fuse multiple segmentation results from different algorithms on a remotely sensed image into one consensus segmentation and determine the best number of segments automatically?"}
+{"slice": "in_corpus", "expected": "1507.06145", "question": "what are the best algorithms for dynamically estimating time-varying sparse signals from streaming data when the dynamics may be inaccurate?"}
+{"slice": "in_corpus", "expected": "2403.03929", "question": "how can transformer-based generative models be used to accurately predict extreme precipitation events in a few hours?"}
+{"slice": "in_corpus", "expected": "1911.08794", "question": "what are the main natural language generation challenges for producing clear, user-tailored explanations of AI decisions that include uncertainty and data quality information?"}
+{"slice": "in_corpus", "expected": "2606.18621", "question": "how can we detect anomalies involving abnormal cross-table relationships and attribute patterns in relational database systems?"}
+{"slice": "in_corpus", "expected": "1501.06297", "question": "how can convolutional neural networks be adapted to learn invariant shape features on curved surfaces for tasks like shape retrieval and correspondence?"}
+{"slice": "in_corpus", "expected": "2603.14778", "question": "how can i securely retrieve an arbitrary number of documents for a language model without the performance hit of sorting?"}
+{"slice": "in_corpus", "expected": "1611.07889", "question": "how can we detect and track highly blurred moving objects in video while recovering their shape and rotation direction?"}
+{"slice": "in_corpus", "expected": "1806.08874", "question": "what are the main theoretical assumptions and limitations of deep learning when trying to build a general-purpose, human-level artificial intelligence system?"}
+{"slice": "in_corpus", "expected": "1910.07268", "question": "how sensitive are the optimized shapes of turbofan rotor blades to different optimizer settings and initializations while maintaining similar aerodynamic performance?"}
+{"slice": "in_corpus", "expected": "2405.10989", "question": "how can we locate the specific neurons in a large language model that store personally identifiable information?"}
+{"slice": "in_corpus", "expected": "2608.01060", "question": "how can cross-view geo-localization be performed efficiently across multiple satellite resolutions without exhaustive gallery scanning?"}
+{"slice": "in_corpus", "expected": "1805.09293", "question": "how can we train a model to produce optimal solutions for continuous optimization problems whose feasible sets change based on context, suitable for real-time decision making?"}
+{"slice": "in_corpus", "expected": "1604.01335", "question": "how can a deep neural network jointly learn multiple visual recognition tasks, such as object detection and sentiment analysis, with fewer parameters and better accuracy than separate specialized models?"}
+{"slice": "in_corpus", "expected": "1504.04599", "question": "how many samples do I need to test whether two unknown discrete distributions are identical when the number of samples drawn from each distribution differs?"}
+{"slice": "in_corpus", "expected": "1811.08012", "question": "do generic visual features match handcrafted ones in predicting image beauty?"}
+{"slice": "in_corpus", "expected": "2605.30943", "question": "how can we learn time-varying transition matrices for financial markets from sparse data while keeping the model interpretable?"}
+{"slice": "in_corpus", "expected": "2103.01907", "question": "how can we assess and implement fairness in machine learning models for credit scoring while balancing profitability?"}
+{"slice": "in_corpus", "expected": "1705.03405", "question": "can removing key actors from an ethnic conflict network reduce subsequent human rights violations?"}
+{"slice": "in_corpus", "expected": "1809.09060", "question": "how can i efficiently estimate prediction uncertainty or confidence intervals for individual outputs of a deep learning model used in virtual screening without retraining multiple models?"}
+{"slice": "in_corpus", "expected": "2308.04398", "question": "does using characters instead of subwords improve neural machine translation quality for closely related languages compared to distant ones?"}
+{"slice": "in_corpus", "expected": "2106.00573", "question": "can a single set of user embeddings learned from massive e-commerce interaction data beat task-specific models for profiling, targeting and recommendation tasks?"}
+{"slice": "in_corpus", "expected": "2306.17798", "question": "how can i use graph-based techniques to improve age estimation of faces when the image contains a lot of irrelevant background?"}
+{"slice": "in_corpus", "expected": "1812.07741", "question": "how can reflectional symmetry be used in deep convolutional networks to improve completion of occluded face images?"}
+{"slice": "in_corpus", "expected": "1904.09644", "question": "how can a device that relies on harvested energy train machine learning models efficiently while deciding which training examples to keep or discard as power availability fluctuates?"}
+{"slice": "in_corpus", "expected": "2607.16274", "question": "can a frozen predictive module from one self-supervised model be used to fill in missing image features when applied to another encoder without additional training?"}
+{"slice": "in_corpus", "expected": "2605.30335", "question": "how can we detect and fix probability inconsistencies that arise when combining predictions from several language-model components that each handle only part of the overall task?"}
+{"slice": "in_corpus", "expected": "1711.06427", "question": "can a graph neural network learn to weight skeletal joints for better action recognition?"}
+{"slice": "in_corpus", "expected": "2306.09586", "question": "can the volume of a convex set of probability distributions serve as an effective measure of uncertainty for binary classification?"}
+{"slice": "in_corpus", "expected": "2204.08985", "question": "can we evolve both the grammar and the probability distribution over rules simultaneously to improve grammatical evolution performance?"}
+{"slice": "in_corpus", "expected": "1601.05535", "question": "how can a single vehicle with cameras or lidar estimate the maximum visible distance along a roadway?"}
+{"slice": "in_corpus", "expected": "1608.02117", "question": "do you know of a large-scale crowdsourced resource that rates how strongly one concept belongs to another category rather than just yes or no?"}
+{"slice": "in_corpus", "expected": "2501.04606", "question": "how can i achieve temporally coherent text-to-image diffusion based video editing without costly model fine-tuning?"}
+{"slice": "in_corpus", "expected": "2006.11654", "question": "how can a policy learned from one patient population be adapted to another with scarce data and unobserved confounding in sequential treatment decisions?"}
+{"slice": "in_corpus", "expected": "1611.08663", "question": "how can we reduce domain shift in zero-shot action recognition by weighting auxiliary training samples according to their relevance to the unseen target classes?"}
+{"slice": "in_corpus", "expected": "1810.00850", "question": "how can we automatically find the area with the most mitoses in a whole slide image to improve consistency of mitotic counting?"}
+{"slice": "in_corpus", "expected": "1507.06105", "question": "is there a random forest approach that evaluates feature importance by considering interactions among features and provides theoretical consistency for classification?"}
+{"slice": "in_corpus", "expected": "2010.03006", "question": "does applying multiple temporal receptive fields with varying convolutional kernel sizes for each input length improve human motion prediction accuracy?"}
+{"slice": "in_corpus", "expected": "1706.08690", "question": "where can i find a large scale face image dataset with many partially occluded faces and varied poses for training detection models?"}
+{"slice": "in_corpus", "expected": "1901.07829", "question": "how can we predict user ratings from review texts while also discovering interpretable aspects of those reviews for recommendation?"}
+{"slice": "in_corpus", "expected": "2211.01762", "question": "how can we predict individual stock trading volumes by learning shared patterns across all stocks while also capturing each stock's unique behavior when data is sparse?"}
+{"slice": "in_corpus", "expected": "1508.02131", "question": "how can i automatically tune hyperparameters for tree kernels in natural language processing without relying on slow grid search?"}
+{"slice": "in_corpus", "expected": "2308.04791", "question": "how can transformer models be adapted to better handle long-term time series forecasting by improving temporal continuity, reducing information loss, and managing multiple input channels?"}
+{"slice": "in_corpus", "expected": "1906.11755", "question": "can singular value decomposition be used as an effective initializer for multi-layer neural network weights to improve training convergence?"}
+{"slice": "in_corpus", "expected": "1604.01252", "question": "how can pairwise image comparison with user preference data be used to learn better representations for image recommendation?"}
+{"slice": "in_corpus", "expected": "2310.14671", "question": "can a population based method that adapts hyper-parameters during training outperform fixed schedules in terms of convergence speed and test loss?"}
+{"slice": "in_corpus", "expected": "2501.05426", "question": "can deep learning models combined with visual explanation methods accurately classify brain tumor, glioma, and meningioma MRI images?"}
+{"slice": "in_corpus", "expected": "1512.05653", "question": "how can i adjust an image enhancement filter for foggy photos to maximize output entropy?"}
+{"slice": "in_corpus", "expected": "1906.11437", "question": "how can depth maps available only during training help improve rgb semantic segmentation performance?"}
+{"slice": "in_corpus", "expected": "1602.06235", "question": "what are the necessary and sufficient conditions for uniquely identifying the underlying class-conditional distributions when each observation is drawn from an unknown mixture of them in mixed membership or partial label settings?"}
+{"slice": "in_corpus", "expected": "1712.06674", "question": "how can we generate vector representations for persian words using neural network models?"}
+{"slice": "in_corpus", "expected": "1911.08177", "question": "can incorporating unlabeled images into the training process of an active learning pipeline improve accuracy when only a few labeled examples are available?"}
+{"slice": "in_corpus", "expected": "2409.06793", "question": "how can one generate perturbations on an image or audio file so its multimodal model embedding matches a chosen target from a different modality?"}
+{"slice": "in_corpus", "expected": "2304.09064", "question": "what does a questionnaire study reveal about it staff's willingness to use ai text generators at work?"}
+{"slice": "in_corpus", "expected": "1901.05737", "question": "what are the major historical milestones and trends in research on genetic algorithms applied to the traveling salesman problem?"}
+{"slice": "in_corpus", "expected": "1702.05413", "question": "how can i efficiently segment three-dimensional cell nuclei using a graph-based approach while keeping memory consumption low?"}
+{"slice": "in_corpus", "expected": "1902.10834", "question": "can we design an evolutionary model with constant population size where random breeding and fitness-based selection lead to a computable equilibrium distribution that exhibits phase transitions as the population increases?"}
+{"slice": "in_corpus", "expected": "2002.06115", "question": "how can we build a fully differentiable neural system that scales to millions of facts for multi-hop reasoning over a symbolic knowledge base?"}
+{"slice": "in_corpus", "expected": "2109.09861", "question": "how can a hierarchical game theoretic model be used to capture human driving behavior while accounting for bounded rationality and avoiding common knowledge assumptions?"}
+{"slice": "in_corpus", "expected": "1605.08163", "question": "how can we estimate the joint probability of multiple moving targets' paths from noisy sensor data using a full bayesian framework?"}
+{"slice": "in_corpus", "expected": "1503.01239", "question": "how can i simultaneously choose representative samples and useful features from high-dimensional data when there are very few or no labels available?"}
+{"slice": "in_corpus", "expected": "2606.17432", "question": "how can i edit a moving 3d head in a video using text prompts while keeping the avatar's identity and motion consistent?"}
+{"slice": "in_corpus", "expected": "1702.04858", "question": "how can combining absolute differences and element-wise products of deep feature pairs improve person re-identification accuracy?"}
+{"slice": "in_corpus", "expected": "1909.00169", "question": "is there a survey that categorizes class imbalance issues in object detection and highlights open research questions?"}
+{"slice": "in_corpus", "expected": "2410.13654", "question": "how do trump and harry differ in their use of framing, emotional language, concreteness, specificity, and pronoun usage during the 2024 presidential debate?"}
+{"slice": "in_corpus", "expected": "1702.04584", "question": "how can an ontology be used to organize and link open data from a historical land registry archive?"}
+{"slice": "in_corpus", "expected": "2602.10722", "question": "how can a diffusion model be used to reconstruct ct images when only a few x-ray angles are available?"}
+{"slice": "in_corpus", "expected": "2408.05924", "question": "how can we adapt a large vision-language model to accurately interpret images and instructions for robotic exploration of mars without extensive retraining?"}
+{"slice": "in_corpus", "expected": "2110.10949", "question": "how can we detect sarcasm or humor in videos and image-text pairs when training data is scarce?"}
+{"slice": "in_corpus", "expected": "2112.09196", "question": "how can we evaluate the reliability of uncertainty predictions from models on biosignal classification tasks when the test data distribution differs from training?"}
+{"slice": "in_corpus", "expected": "1802.04407", "question": "does matching the latent space of a graph autoencoder to a known prior distribution improve link prediction and clustering accuracy?"}
+{"slice": "in_corpus", "expected": "1703.00617", "question": "what sampling strategy reduces labeling effort while accurately estimating f-measure in entity resolution?"}
+{"slice": "in_corpus", "expected": "2302.08503", "question": "how can i perform unpaired image-to-image translation on very limited microscopy data to highlight subtle cell phenotype differences?"}
+{"slice": "in_corpus", "expected": "2310.14652", "question": "how can we deconfound face recognition models without expensive demographic annotations?"}
+{"slice": "in_corpus", "expected": "2003.05669", "question": "how can an autoencoder be trained to avoid reconstructing anomalous data while still accurately reproducing normal samples for novelty detection?"}
+{"slice": "in_corpus", "expected": "2504.16755", "question": "can we learn a reduced parameter set for qaoa from solutions to smaller problem sizes to speed up optimization on larger maxcut instances?"}
+{"slice": "in_corpus", "expected": "1802.04032", "question": "what is the expected size of a minimal set of implications that captures all attribute dependencies in a random formal context?"}
+{"slice": "in_corpus", "expected": "2601.22275", "question": "how can we efficiently compute spatio-temporal attention in video diffusion transformers to reduce computational cost while preserving generation quality?"}
+{"slice": "in_corpus", "expected": "1612.02605", "question": "how can we train agents to actively search for missing pieces of information in partially observed environments to accomplish tasks?"}
+{"slice": "in_corpus", "expected": "2502.09985", "question": "how can i reduce the width of prediction intervals from split conformal regression by choosing a better base predictor?"}
+{"slice": "in_corpus", "expected": "2305.05110", "question": "how can we train a keyword spotting model across many mobile devices when most of their audio recordings are unlabeled and only a small set of labeled examples is available on the central server?"}
 {"slice": "out_of_corpus", "expected": null, "question": "what is the best recipe for sourdough bread?"}
 {"slice": "out_of_corpus", "expected": null, "question": "who won the 2018 FIFA World Cup?"}
 {"slice": "out_of_corpus", "expected": null, "question": "how do I change a flat car tyre?"}
 {"slice": "out_of_corpus", "expected": null, "question": "what were Apple's quarterly earnings last year?"}
 {"slice": "out_of_corpus", "expected": null, "question": "how do I register a limited company in Turkey?"}
 {"slice": "out_of_corpus", "expected": null, "question": "what is the correct dosage of paracetamol for a child?"}
-{"slice": "keyword", "expected": "2406.06538", "question": "2406.06538"}
-{"slice": "keyword", "expected": "1607.00470", "question": "Keyframe-based monocular SLAM: design, survey, and future directions"}
 {"slice": "keyword", "expected": null, "question": "papers that do NOT use transformers"}
 {"slice": "keyword", "expected": null, "question": "papers by Yoshua Bengio"}

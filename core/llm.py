@@ -18,9 +18,14 @@ class LLMError(RuntimeError):
     pass
 
 
-def _ollama(prompt: str, system: str | None) -> str:
+def _ollama(
+    prompt: str,
+    system: str | None,
+    model: str | None = None,
+    schema: dict | None = None,
+) -> str:
     payload = {
-        "model": settings.ollama_model,
+        "model": model or settings.ollama_model,
         "prompt": prompt,
         "stream": False,
         "options": {
@@ -30,6 +35,12 @@ def _ollama(prompt: str, system: str | None) -> str:
     }
     if system:
         payload["system"] = system
+    if schema:
+        # Constrained decoding: Ollama restricts sampling to tokens that can still
+        # complete a document matching the schema. Asking for JSON in the prompt is
+        # a request the model can ignore — and it does, with preambles and code
+        # fences that only fail once something tries to parse them.
+        payload["format"] = schema
 
     request = urllib.request.Request(
         f"{settings.ollama_host}/api/generate",
@@ -42,11 +53,12 @@ def _ollama(prompt: str, system: str | None) -> str:
     except urllib.error.URLError as exc:
         raise LLMError(
             f"cannot reach Ollama at {settings.ollama_host} ({exc}). "
-            f"Start it with `ollama serve`, then `ollama pull {settings.ollama_model}`."
+            f"Start it with `ollama serve`, then "
+            f"`ollama pull {model or settings.ollama_model}`."
         ) from exc
 
 
-def _openai(prompt: str, system: str | None) -> str:
+def _openai(prompt: str, system: str | None, model: str | None = None) -> str:
     if not settings.openai_api_key:
         raise LLMError("LLM_PROVIDER=openai but OPENAI_API_KEY is empty")
 
@@ -56,7 +68,7 @@ def _openai(prompt: str, system: str | None) -> str:
         {"role": "user", "content": prompt}
     ]
     response = OpenAI(api_key=settings.openai_api_key).chat.completions.create(
-        model=settings.openai_model,
+        model=model or settings.openai_model,
         messages=messages,
         temperature=settings.llm_temperature,
         max_tokens=settings.llm_max_tokens,
@@ -64,9 +76,21 @@ def _openai(prompt: str, system: str | None) -> str:
     return response.choices[0].message.content or ""
 
 
-def complete(prompt: str, system: str | None = None) -> str:
+def complete(
+    prompt: str,
+    system: str | None = None,
+    model: str | None = None,
+    schema: dict | None = None,
+) -> str:
+    """`model` overrides the configured one for this call only.
+
+    It exists so a task can deliberately use a *different* model from the one
+    being measured. Generating evaluation questions with the same model that
+    answers them produces questions shaped by its blind spots — easy for exactly
+    the system under test, and flattering in a way nothing in the output reveals.
+    """
     if settings.llm_provider == "ollama":
-        return _ollama(prompt, system)
+        return _ollama(prompt, system, model, schema)
     if settings.llm_provider == "openai":
-        return _openai(prompt, system)
+        return _openai(prompt, system, model)
     raise LLMError(f"unknown LLM_PROVIDER: {settings.llm_provider!r}")
