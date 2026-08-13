@@ -32,6 +32,11 @@ MAPPING = {
             # to fix.
             "id": {"type": "keyword"},
             "title": {"type": "text", "analyzer": "english"},
+            # Author search is only possible through the lexical arm: a name
+            # carries no meaning to embed, so dense retrieval cannot answer
+            # "papers by Yoshua Bengio" at all. Analysed as text rather than
+            # keyword so a surname matches inside a full author list.
+            "authors": {"type": "text", "analyzer": "standard"},
             "abstract": {"type": "text", "analyzer": "english"},
             "url": {"type": "keyword", "index": False},
         }
@@ -58,7 +63,7 @@ def build(rebuild: bool = False) -> int:
     with connection() as conn, conn.cursor() as cur:
         cur.execute("select count(*) from papers")
         total = cur.fetchone()[0]
-        cur.execute("select id, title, abstract, url from papers")
+        cur.execute("select id, title, abstract, url, authors from papers")
         rows = cur.fetchall()
 
     started = time.perf_counter()
@@ -69,10 +74,11 @@ def build(rebuild: bool = False) -> int:
         # document. `index` upserts on the id, so re-running replaces rather than
         # duplicating — the same property `clean` has, for the same reason.
         lines = []
-        for paper_id, title, abstract, url in batch:
+        for paper_id, title, abstract, url, authors in batch:
             lines.append(json.dumps({"index": {"_index": INDEX, "_id": paper_id}}))
             lines.append(
-                json.dumps({"id": paper_id, "title": title, "abstract": abstract, "url": url})
+                json.dumps({"id": paper_id, "title": title, "abstract": abstract,
+                            "authors": authors, "url": url})
             )
         _bulk("\n".join(lines) + "\n")
         written += len(batch)

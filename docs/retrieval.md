@@ -21,16 +21,25 @@ $ uv run python -m scripts.ask "what is an attention mechanism in neural network
 
 Two failures, both reproduced against this corpus rather than quoted from a blog post:
 
-**Exact identifiers.** Asked for `2406.06538` — a paper that *is* in the corpus — semantic search does
-not return it in the top 20. It answers with unrelated optimisation papers at distance 0.52, because
-an identifier carries no meaning to embed. A keyword index finds it in one lookup.
+**Exact identifiers — fixed by BM25.** An arXiv id carries no meaning to embed, so dense search
+answers with unrelated papers at distance 0.52 and never returns the right one. With the lexical arm
+indexing `id` as a keyword, asking for `1708.07367` returns that paper in the top three.
 
-**Negation.** Asked for "papers that do NOT use transformers", the second result is *Simplifying
-Transformer Blocks*. Embeddings have no representation for negation: "not X" lands next to "X".
+*(The original example here was `2406.06538`. It is no longer in the corpus: growing 30,061 → 90,088
+redrew the sample rather than extending it, and the paper the claim rested on left with it. Recorded
+because a documented example that quietly stops being true is the same failure the ledger tracks.)*
 
-Both are the standard argument for hybrid retrieval. Neither is hypothetical here — they are what
-this corpus actually does — so hybrid retrieval is a required part of the single release rather than
-a later version.
+**Negation — not fixed, and BM25 makes it worse.** Asked for "papers that do NOT use transformers",
+four of the top five are about transformers. Embeddings have no representation for negation, so "not
+X" lands next to "X"; BM25 then matches the very token being excluded. Both arms fail in the same
+direction, which is exactly when fusion cannot help. This needs query understanding rather than
+retrieval, and is out of scope.
+
+**Author queries — where fusion actively hurts.** BM25 alone answers `Yoshua Bengio` with three of
+his papers in the top three. Fused, a paper by someone else takes first place: a name is
+unembeddable, the dense arm returns noise, and RRF weights that noise equally with the arm that
+worked. Hybrid is better *on average* and worse on this class, which is the argument for
+query-dependent routing — measured, and not built.
 
 **The release answers them with Elasticsearch beside pgvector, not instead of it.** Dense retrieval
 stays in Postgres; a lexical BM25 index goes into Elasticsearch; the two ranked lists fuse with
@@ -39,7 +48,7 @@ are different units and averaging them is meaningless.
 
 The alternative was Postgres' own full-text search, which would have kept everything in one
 datastore. It was not chosen: a real lexical engine is what production systems put in front of this
-problem, `2406.06538` is exactly the query BM25 exists for, and running the two engines side by side
+problem, an exact identifier is precisely the query BM25 exists for, and running the two engines side by side
 is what makes the comparison publishable — dense alone, lexical alone, and fused, over the same
 questions. A hybrid result without the two arms measured separately is an assertion. This work is
 done and accepted locally before the cloud image is rebuilt and deployed.

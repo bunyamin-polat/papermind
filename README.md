@@ -201,6 +201,15 @@ that is what stops the bulk-load path and the per-request path from bleeding int
   corpus changes, and that is a required step rather than a courtesy.
 - **HNSW is approximate**, and its agreement with exact search has not been re-measured at 90,088
   vectors. The 96.5% figure below belongs to the 30,061-vector index.
+- **Hybrid wins on average and loses on author queries.** Fusion helps because the two arms fail on
+  different questions. When one arm is *structurally* incapable the same mechanism hurts: a person's
+  name carries nothing to embed, so the dense arm returns noise, and RRF weights that noise equally.
+  Asked for `Yoshua Bengio`, BM25 alone returns three of his papers in the top three; fused, a paper
+  by someone else takes first place. Query-dependent routing is the obvious answer and is not built.
+- **Negation is unfixed, and BM25 makes it worse.** Asked for papers that do *not* use transformers,
+  four of the top five are about transformers — the dense arm has no representation for "not", and
+  the lexical arm matches the very token being excluded. The two arms fail in the same direction, so
+  fusion cannot rescue it. This needs query understanding, not retrieval, and is out of scope here.
 
 ## Documentation
 

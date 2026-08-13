@@ -72,7 +72,7 @@ class LexicalBackend:
                     # abstract may be one mention in passing. `id` is weighted
                     # hardest: a question containing an arXiv identifier is asking
                     # for that exact paper and nothing else.
-                    "fields": ["id^10", "title^2", "abstract"],
+                    "fields": ["id^10", "title^2", "authors^2", "abstract"],
                 }
             },
         }
